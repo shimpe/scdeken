@@ -1,6 +1,7 @@
 package install
 
 import (
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -101,7 +102,7 @@ func TestRemoveInUseMessage(t *testing.T) {
 	t.Cleanup(func() { rename = real })
 
 	err := s.Remove("fmx6")
-	if err == nil || !strings.Contains(err.Error(), "s.quit") {
+	if !errors.Is(err, ErrInUse) || !strings.Contains(err.Error(), "s.quit") {
 		t.Fatalf("err = %v", err)
 	}
 	if !exists(filepath.Join(dir, "FMX6.scx")) || len(s.State.Packages) != 1 {
@@ -125,5 +126,18 @@ func TestQuarantineMoves(t *testing.T) {
 	}
 	if err := s.ClearQuarantine(); err != nil || exists(s.Paths.Quarantine) {
 		t.Errorf("clear: %v", err)
+	}
+}
+
+func TestQuarantineRejectsBadID(t *testing.T) {
+	s := applyService(t)
+	dir := installManaged(t, s, "1.0.0")
+	for _, id := range []string{`..\..\x`, "../x", "", "SCD-1"} {
+		if _, err := s.Quarantine(dir, id); err == nil || !strings.Contains(err.Error(), "not a valid advisory id") {
+			t.Errorf("id %q: err = %v", id, err)
+		}
+	}
+	if !exists(dir) || exists(s.Paths.Quarantine) {
+		t.Error("nothing may move for a bad id")
 	}
 }

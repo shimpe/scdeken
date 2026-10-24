@@ -37,6 +37,8 @@ type Item struct {
 	Latest          string             `json:"latest,omitempty"`
 	UpdateAvailable bool               `json:"update_available"`
 	Advisory        *advisory.Advisory `json:"advisory,omitempty"`
+
+	repo string // where this copy came from; "" when unknown
 }
 
 // List returns everything sc-deken knows is installed: its own records and
@@ -70,7 +72,7 @@ func (s *Service) Updates() []Item {
 func (s *Service) entryItem(e state.Entry) Item {
 	it := Item{
 		Name: e.Name, Version: e.Version, Commit: e.Commit,
-		Kind: e.Kind, Path: e.Path, Source: SourceManaged,
+		Kind: e.Kind, Path: e.Path, Source: SourceManaged, repo: e.Repo,
 	}
 	if e.Route == state.External {
 		it.Source = SourceExternal
@@ -85,7 +87,7 @@ func (s *Service) entryItem(e state.Entry) Item {
 
 // quarkItem describes a quark reported by SuperCollider.
 func (s *Service) quarkItem(q scenv.Quark) Item {
-	it := Item{Name: q.Name, Commit: q.Commit, Kind: "quark", Path: q.Path, Source: SourceQuark}
+	it := Item{Name: q.Name, Commit: q.Commit, Kind: "quark", Path: q.Path, Source: SourceQuark, repo: q.URL}
 	pkg, ok := s.Index.FindRepo(q.URL)
 	if ok {
 		it.Version = releaseForCommit(pkg, q.Commit)
@@ -210,6 +212,9 @@ func (s *Service) forget(entry state.Entry) error {
 // Quarantine moves the folder or file at path into the quarantine folder
 // for advisory advisoryID and returns where it went. Nothing is deleted.
 func (s *Service) Quarantine(path, advisoryID string) (string, error) {
+	if !advisory.ValidID(advisoryID) {
+		return "", fmt.Errorf("not a valid advisory id: %q", advisoryID)
+	}
 	base := filepath.Base(path)
 	dir := filepath.Join(s.Paths.Quarantine, advisoryID)
 	if err := os.MkdirAll(dir, 0o755); err != nil {

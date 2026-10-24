@@ -198,3 +198,6 @@ func Match(advs []Advisory, inst []Installed) []Hit {
 	}
 	return hits
 }
+
+// ValidID reports whether id looks like SCD-2026-0001.
+func ValidID(id string) bool { return idPattern.MatchString(id) }

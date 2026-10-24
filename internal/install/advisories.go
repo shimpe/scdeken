@@ -7,6 +7,7 @@ import (
 
 	"github.com/sc-deken/sc-deken/internal/advisory"
 	"github.com/sc-deken/sc-deken/internal/index"
+	"github.com/sc-deken/sc-deken/internal/version"
 )
 
 // AdvisoryHit says that an advisory affects an installed package.
@@ -35,7 +36,7 @@ func (s *Service) CheckAdvisories() []AdvisoryHit {
 		it := findItem(items, h.Installed.Path, h.Installed.Name)
 		hits = append(hits, AdvisoryHit{
 			Advisory: h.Advisory, Item: it,
-			FixedVersion: s.fixedVersion(h.Advisory, it),
+			FixedVersion: s.fixedVersion(it),
 		})
 	}
 	return hits
@@ -66,22 +67,6 @@ func (s *Service) unkeptAdvisories() []advisory.Advisory {
 	return out
 }
 
-// repoOf is the repository an installed item came from, "" when unknown.
-func (s *Service) repoOf(it Item) string {
-	if pkg, ok := s.Index.Find(it.Name); ok {
-		return pkg.Repo
-	}
-	if e, ok := s.State.Packages[strings.ToLower(it.Name)]; ok {
-		return e.Repo
-	}
-	for _, q := range s.Ctx.Quarks {
-		if q.Path == it.Path {
-			return q.URL
-		}
-	}
-	return ""
-}
-
 // externalCopies scans the extension folders for copies of the packages the
 // advisories talk about that are not already in known.
 func (s *Service) externalCopies(advs []advisory.Advisory, known []Item) []Item {
@@ -106,7 +91,7 @@ func (s *Service) externalCopies(advs []advisory.Advisory, known []Item) []Item 
 			seen[key] = true
 			out = append(out, Item{
 				Name: pkg.Name, Kind: string(pkg.Kind), Path: d.Path,
-				Source: SourceExternal, Trust: string(pkg.Trust),
+				Source: SourceExternal, Trust: string(pkg.Trust), repo: pkg.Repo,
 			})
 		}
 	}
@@ -126,29 +111,6 @@ func (s *Service) advisoryPackage(a advisory.Advisory) (*index.Package, bool) {
 	return nil, false
 }
 
-// fixedVersion is the newest release newer than the installed one that the
-// advisory does not affect; "" when there is none or the installed version
-// is unknown.
-func (s *Service) fixedVersion(a advisory.Advisory, it Item) string {
-	pkg, ok := s.Index.Find(it.Name)
-	if !ok {
-		pkg, ok = s.advisoryPackage(a)
-	}
-	if !ok || it.Version == "" {
-		return ""
-	}
-	best := ""
-	for _, r := range pkg.Versions {
-		if a.Affects(pkg.Name, pkg.Repo, r.Version, r.Commit) || !newer(r.Version, it.Version) {
-			continue
-		}
-		if best == "" || newer(r.Version, best) {
-			best = r.Version
-		}
-	}
-	return best
-}
-
 // Keep remembers that the user wants to keep the packages advisoryID
 // withdraws, so CheckAdvisories stops reporting it.
 func (s *Service) Keep(advisoryID string) error {
@@ -163,4 +125,65 @@ func (s *Service) Keep(advisoryID string) error {
 		return fmt.Errorf("remember kept advisory %s: %w", advisoryID, err)
 	}
 	return nil
+}
+
+// repoOf is the repository an installed copy came from, "" when unknown.
+// Only a copy with no recorded origin is looked up by name, so a quark
+// that merely shares a name with an indexed package is not taken for it.
+func (s *Service) repoOf(it Item) string {
+	if it.repo != "" {
+		return it.repo
+	}
+	if pkg, ok := s.Index.Find(it.Name); ok {
+		return pkg.Repo
+	}
+	return ""
+}
+
+// packageOf finds the indexed package an installed copy belongs to.
+func (s *Service) packageOf(it Item) (*index.Package, bool) {
+	if repo := s.repoOf(it); repo != "" {
+		return s.Index.FindRepo(repo)
+	}
+	return nil, false
+}
+
+// fixedVersion is the newest release newer than the installed one that no
+// advisory withdraws; "" when there is none or the installed version is
+// unknown. Stable releases are preferred over unstable ones.
+func (s *Service) fixedVersion(it Item) string {
+	pkg, ok := s.packageOf(it)
+	if !ok || it.Version == "" {
+		return ""
+	}
+	var stable, unstable string
+	for i := range pkg.Versions {
+		r := &pkg.Versions[i]
+		if _, withdrawn := s.Index.Retraction(pkg, r); withdrawn || !newer(r.Version, it.Version) {
+			continue
+		}
+		if isPrerelease(r) {
+			unstable = newest(unstable, r.Version)
+		} else {
+			stable = newest(stable, r.Version)
+		}
+	}
+	if stable != "" {
+		return stable
+	}
+	return unstable
+}
+
+// isPrerelease reports whether r is unstable or has a pre-release version.
+func isPrerelease(r *index.Release) bool {
+	v, err := version.Parse(r.Version)
+	return r.Unstable || (err == nil && v.IsPrerelease())
+}
+
+// newest returns the later of two versions; "" counts as none.
+func newest(a, b string) string {
+	if a == "" || newer(b, a) {
+		return b
+	}
+	return a
 }

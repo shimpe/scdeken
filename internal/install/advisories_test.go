@@ -75,3 +75,48 @@ func TestKeepSuppresses(t *testing.T) {
 		t.Errorf("saved = %+v, %v", saved, err)
 	}
 }
+
+func TestCheckAdvisoriesSameNameOtherRepo(t *testing.T) {
+	s := applyService(t)
+	s.Index.Advisories = []advisory.Advisory{
+		{ID: "SCD-2026-0003", Repo: "https://github.com/evil/Panola", Versions: []string{"*"}, Severity: advisory.Malware},
+	}
+	s.Ctx.Quarks = []scenv.Quark{{Name: "Panola", URL: "https://github.com/evil/Panola", Path: "/q/Panola", Commit: panolaCommit}}
+	hits := s.CheckAdvisories()
+	if len(hits) != 1 || hits[0].Item.Path != "/q/Panola" {
+		t.Fatalf("hits = %+v", hits)
+	}
+}
+
+func TestFixedVersionSkipsOtherWithdrawn(t *testing.T) {
+	s := applyService(t)
+	installManaged(t, s, "1.2.0")
+	setVersions(t, s, "fmx6",
+		index.Release{Version: "1.4.0", Commit: "d"},
+		index.Release{Version: "1.3.0", Commit: "c"},
+		index.Release{Version: "1.2.0", Commit: fmx6Commit})
+	s.Index.Advisories = []advisory.Advisory{
+		{ID: "SCD-2026-0004", Package: "fmx6", Versions: []string{"1.2.0"}, Severity: advisory.Malware},
+		{ID: "SCD-2026-0005", Package: "fmx6", Versions: []string{"1.3.0"}, Severity: advisory.Malware},
+	}
+	hits := s.CheckAdvisories()
+	if len(hits) != 1 || hits[0].FixedVersion != "1.4.0" {
+		t.Fatalf("hits = %+v", hits)
+	}
+}
+
+func TestFixedVersionPrefersStable(t *testing.T) {
+	s := applyService(t)
+	installManaged(t, s, "1.2.0")
+	setVersions(t, s, "fmx6",
+		index.Release{Version: "2.0.0-rc.1", Commit: "e"},
+		index.Release{Version: "1.3.0", Commit: "c"},
+		index.Release{Version: "1.2.0", Commit: fmx6Commit})
+	s.Index.Advisories = []advisory.Advisory{
+		{ID: "SCD-2026-0006", Package: "fmx6", Versions: []string{"1.2.0"}, Severity: advisory.Malware},
+	}
+	hits := s.CheckAdvisories()
+	if len(hits) != 1 || hits[0].FixedVersion != "1.3.0" {
+		t.Fatalf("hits = %+v", hits)
+	}
+}
