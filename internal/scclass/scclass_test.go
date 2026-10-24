@@ -65,16 +65,6 @@ B { }`
 	}
 }
 
-func TestParseUnbalanced(t *testing.T) {
-	for _, src := range []string{"A { foo {", "}} B { }", "/* open", "\"open", "A :", "A[", "$", "+"} {
-		Parse([]byte(src)) // must not panic
-	}
-	got := Parse([]byte("}} B { "))
-	if want := []Class{{"B", ""}}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("got %v, want %v", got, want)
-	}
-}
-
 func TestSplitTransitive(t *testing.T) {
 	classes := []Class{{"B", "A"}, {"A", "UGen"}, {"C", "Object"}, {"A", "UGen"}}
 	ugens, others := Split(classes)
@@ -90,5 +80,34 @@ func TestSplitCycleTerminates(t *testing.T) {
 	_, others := Split([]Class{{"A", "B"}, {"B", "A"}})
 	if want := []string{"A", "B"}; !reflect.DeepEqual(others, want) {
 		t.Fatalf("others %v, want %v", others, want)
+	}
+}
+
+func TestParseUnbalanced(t *testing.T) {
+	tests := []struct {
+		src  string
+		want []Class
+	}{
+		{"A { foo {", []Class{{"A", ""}}},
+		{"}} B { }", []Class{{"B", ""}}},
+		{"}} B { ", []Class{{"B", ""}}},
+		{"/* open", nil},
+		{"\"open", nil},
+		{"A :", nil},
+		{"A[", nil},
+		{"$", nil},
+		{"+", nil},
+		{"+//x", nil},
+		{"+ //", nil},
+		{"A : //x", nil},
+		{"A://", nil},
+		{"B { } +//x", []Class{{"B", ""}}},
+	}
+	for _, tt := range tests {
+		b := []byte(tt.src)
+		b = b[:len(b):len(b)] // no spare capacity to hide out-of-range slicing
+		if got := Parse(b); !reflect.DeepEqual(got, tt.want) {
+			t.Errorf("Parse(%q) = %v, want %v", tt.src, got, tt.want)
+		}
 	}
 }

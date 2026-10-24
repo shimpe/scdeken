@@ -31,18 +31,18 @@ func Parse(src []byte) []Class {
 		switch c := s.src[s.pos]; {
 		case c == '{':
 			depth++
-			s.pos++
+			s.advance(1)
 		case c == '}':
 			if depth > 0 {
 				depth--
 			}
-			s.pos++
+			s.advance(1)
 		case c == '"' || c == '\'':
 			s.skipQuoted(c)
 		case c == '$':
 			s.skipChar()
 		case c == '+' && depth == 0:
-			s.pos++
+			s.advance(1)
 			s.skipTrivia()
 			s.ident() // the extended class is not a definition
 		case isIdentChar(c):
@@ -54,7 +54,7 @@ func Parse(src []byte) []Class {
 				s.ident()
 			}
 		default:
-			s.pos++
+			s.advance(1)
 		}
 	}
 }
@@ -125,7 +125,7 @@ func (s *scanner) header() (Class, bool) {
 	}
 	super := ""
 	if s.peek() == ':' {
-		s.pos++
+		s.advance(1)
 		s.skipTrivia()
 		if super = s.ident(); super == "" {
 			s.pos = afterName
@@ -145,7 +145,7 @@ func (s *scanner) skipTrivia() {
 	for !s.done() {
 		switch {
 		case isSpace(s.src[s.pos]):
-			s.pos++
+			s.advance(1)
 		case s.hasPrefix("//"):
 			s.skipUntil('\n')
 		case s.hasPrefix("/*"):
@@ -163,57 +163,57 @@ func (s *scanner) skipBlockComment() {
 		switch {
 		case s.hasPrefix("/*"):
 			depth++
-			s.pos += 2
+			s.advance(2)
 		case s.hasPrefix("*/"):
 			depth--
-			s.pos += 2
+			s.advance(2)
 			if depth == 0 {
 				return
 			}
 		default:
-			s.pos++
+			s.advance(1)
 		}
 	}
 }
 
 // skipQuoted skips a "string" or 'symbol' whose opening quote is current.
 func (s *scanner) skipQuoted(quote byte) {
-	s.pos++
+	s.advance(1)
 	for !s.done() {
 		switch s.src[s.pos] {
 		case '\\':
-			s.pos += 2
+			s.advance(2)
 		case quote:
-			s.pos++
+			s.advance(1)
 			return
 		default:
-			s.pos++
+			s.advance(1)
 		}
 	}
 }
 
 // skipChar skips a character literal: $x or $\x.
 func (s *scanner) skipChar() {
-	s.pos++
+	s.advance(1)
 	if s.peek() == '\\' {
-		s.pos++
+		s.advance(1)
 	}
-	s.pos++
+	s.advance(1)
 }
 
 // skipUntil moves past the next occurrence of b, or to the end of input.
 func (s *scanner) skipUntil(b byte) {
 	for !s.done() && s.src[s.pos] != b {
-		s.pos++
+		s.advance(1)
 	}
-	s.pos++
+	s.advance(1)
 }
 
 // ident reads an identifier ([A-Za-z0-9_]+) and returns it.
 func (s *scanner) ident() string {
 	start := s.pos
 	for !s.done() && isIdentChar(s.src[s.pos]) {
-		s.pos++
+		s.advance(1)
 	}
 	return string(s.src[start:s.pos])
 }
@@ -223,3 +223,6 @@ func isUpper(c byte) bool { return c >= 'A' && c <= 'Z' }
 func isIdentChar(c byte) bool {
 	return isUpper(c) || c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '_'
 }
+
+// advance moves forward n bytes, never past the end of input.
+func (s *scanner) advance(n int) { s.pos = min(s.pos+n, len(s.src)) }
