@@ -29,6 +29,7 @@ type Request struct {
 	AdvisoryID        string          `json:"advisory_id,omitempty"`
 	Offline           bool            `json:"offline,omitempty"`
 	IndexURL          string          `json:"index_url,omitempty"`
+	Maint             MaintainerArgs  `json:"maintainer,omitempty"`
 	Context           scenv.Context   `json:"context"`
 }
 
@@ -81,4 +82,23 @@ func firstError(errs ...error) error {
 		}
 	}
 	return nil
+}
+
+// MaintainerArgs are the options only the maintainer and CI commands (index,
+// ci, build, advisories validate) use.
+type MaintainerArgs struct {
+	Recipes      string `json:"recipes,omitempty"`       // folder of recipe files
+	Advisories   string `json:"advisories,omitempty"`    // folder of advisory files
+	SCVersions   string `json:"sc_versions,omitempty"`   // sc-versions.toml
+	Previous     string `json:"previous,omitempty"`      // last published index, URL or file
+	Directory    string `json:"directory,omitempty"`     // quarks directory, URL or file; default the official one
+	ReleasesRepo string `json:"releases_repo,omitempty"` // OWNER/NAME holding the prebuilt release assets
+	Limit        int    `json:"limit,omitempty"`         // index build: only the first N directory entries and topic repositories
+	In           string `json:"in,omitempty"`            // index sign: the index file
+	OutDir       string `json:"out_dir,omitempty"`       // index keygen: where the key files go
+	PasswordEnv  string `json:"password_env,omitempty"`  // index keygen: environment variable holding the password
+	Base         string `json:"base,omitempty"`          // ci matrix: git revision to compare with
+	Arch         string `json:"arch,omitempty"`          // build: x86_64, arm64 or universal
+	VcpkgRoot    string `json:"vcpkg_root,omitempty"`    // build: vcpkg checkout
+	Dir          string `json:"dir,omitempty"`           // advisories validate: the folder
 }

@@ -153,7 +153,7 @@ func DraftRecipe(url string, meta github.Repo, scan Scan, head string, tags map[
 	r.Summary, notes = draftSummary(meta, scan, notes)
 	r.License, notes = draftLicense(meta, scan, notes)
 	if r.HasPlugin() {
-		r.Build = draftBuild(scan)
+		r.Build = DraftBuild(scan)
 	}
 	rel := PickRelease(head, tags)
 	r.Versions = recipe.Versions{
@@ -193,7 +193,8 @@ func draftLicense(meta github.Repo, scan Scan, notes []string) (string, []string
 	return "TODO", append(notes, "license: could not be determined; enter its SPDX id")
 }
 
-func draftBuild(scan Scan) *recipe.Build {
+// DraftBuild turns the CMake layout found by a scan into a build description.
+func DraftBuild(scan Scan) *recipe.Build {
 	b := &recipe.Build{System: "cmake", SCPathVar: scan.SCPathVar, Submodules: scan.Submodules}
 	if b.SCPathVar == "" {
 		b.SCPathVar = "SC_PATH"

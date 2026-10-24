@@ -32,6 +32,10 @@ commands:
   recipe new <github-url> [--out <file>]
   recipe check <file> [--build] [--sc-version 3.14.1]
   recipe approve <file> <version> <commit>
+  index build|sign|keygen|new-versions   (maintainers)
+  advisories validate --dir <folder>
+  ci matrix|platforms|pack   (CI)
+  build --recipe <file> --version <v> --out <folder>   (CI)
   run <request.json> <result.json>`
 
 // global holds the flags that come before the command name.

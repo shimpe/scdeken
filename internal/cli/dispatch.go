@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -18,7 +19,8 @@ type Deps struct {
 	Now         func() time.Time
 	EmbeddedKey string
 	Stderr      io.Writer
-	GitHubURL   string // GitHub API address; tests point it at a fake, "" means the real one
+	GitHubURL   string    // GitHub API address; tests point it at a fake, "" means the real one
+	Stdin       io.Reader // where passwords are read from; nil means the terminal
 }
 
 func (d Deps) withDefaults() Deps {
@@ -27,6 +29,9 @@ func (d Deps) withDefaults() Deps {
 	}
 	if d.Now == nil {
 		d.Now = time.Now
+	}
+	if d.Stdin == nil {
+		d.Stdin = os.Stdin
 	}
 	if d.Stderr == nil {
 		d.Stderr = io.Discard

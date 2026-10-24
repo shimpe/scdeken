@@ -161,18 +161,7 @@ func buildNewest(ctx context.Context, r recipe.Recipe, scVersion string, s *sess
 	if !r.HasPlugin() {
 		return nil, fmt.Errorf("%s is a quark; there is nothing to build", r.Name)
 	}
-	if scVersion == "" {
-		scVersion = defaultSCVersion
-	}
-	sc, err := version.Parse(scVersion)
-	if err != nil {
-		return nil, usageError{fmt.Sprintf("%q is not a SuperCollider version like %s", scVersion, defaultSCVersion)}
-	}
-	cache, err := os.UserCacheDir()
-	if err != nil {
-		return nil, fmt.Errorf("find the cache folder: %w", err)
-	}
-	h, err := headers.Ensure(ctx, s.deps.Runner, filepath.Join(cache, "sc-deken", "headers"), sc, s.log)
+	h, err := ensureHeaders(ctx, s, scVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -201,4 +190,21 @@ func runRecipeApprove(_ context.Context, req Request, _ *session) (any, error) {
 		return nil, err
 	}
 	return map[string]string{"approved": req.Version}, nil
+}
+
+// ensureHeaders makes sure the SuperCollider headers for scVersion (default
+// defaultSCVersion) are in the shared cache folder.
+func ensureHeaders(ctx context.Context, s *session, scVersion string) (headers.Headers, error) {
+	if scVersion == "" {
+		scVersion = defaultSCVersion
+	}
+	sc, err := version.Parse(scVersion)
+	if err != nil {
+		return headers.Headers{}, usageError{fmt.Sprintf("%q is not a SuperCollider version like %s", scVersion, defaultSCVersion)}
+	}
+	cache, err := os.UserCacheDir()
+	if err != nil {
+		return headers.Headers{}, fmt.Errorf("find the cache folder: %w", err)
+	}
+	return headers.Ensure(ctx, s.deps.Runner, filepath.Join(cache, "sc-deken", "headers"), sc, s.log)
 }

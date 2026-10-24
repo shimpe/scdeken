@@ -13,4 +13,6 @@ const (
 	DefaultIndexURL = "https://sc-deken.github.io/sc-deken-recipes/index.json"
 	// SCRepoURL is the SuperCollider source repository.
 	SCRepoURL = "https://github.com/supercollider/supercollider"
+	// QuarksDirectoryURL is the official list of quarks the indexer reads.
+	QuarksDirectoryURL = "https://raw.githubusercontent.com/supercollider-quarks/quarks/master/directory.txt"
 )
