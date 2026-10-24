@@ -50,4 +50,18 @@ TestDekenJSON : UnitTest {
 	test_parseRejectsGarbage {
 		this.assertException({ DekenJSON.parse("{\"a\":}") }, Error, "garbage should throw")
 	}
+	test_stringifyKeepsNonAscii {
+		this.assertEquals(DekenJSON.stringify("é"), "\"é\"")
+	}
+
+	test_roundTripNonAscii {
+		var s = "é ü 😀 C:/Users/Stéfaan";
+		this.assertEquals(DekenJSON.parse(DekenJSON.stringify([s]))[0], s)
+	}
+
+	test_parseRejectsMalformedNumbers {
+		["-", "1.2.3", "--5", "1e", "01", "1.", "+1"].do { |text|
+			this.assertException({ DekenJSON.parse(text) }, Error, "should reject " ++ text)
+		}
+	}
 }

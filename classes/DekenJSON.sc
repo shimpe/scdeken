@@ -65,7 +65,7 @@ DekenJSON {
 		{ c == Char.nl } { "\\n" }
 		{ c == Char.tab } { "\\t" }
 		{ c == Char.ret } { "\\r" }
-		{ c.ascii < 32 } { "\\u00" ++ c.ascii.asHexString(2).toLower }
+		{ c.ascii >= 0 and: { c.ascii < 32 } } { "\\u00" ++ c.ascii.asHexString(2).toLower }
 		{ c.asString };
 	}
 
@@ -122,6 +122,7 @@ DekenJSON {
 		var start = pos, token, asFloat;
 		while { pos < src.size and: { "+-.eE0123456789".includes(src[pos]) } } { pos = pos + 1 };
 		token = src.copyRange(start, pos - 1);
+		if("^-?(0|[1-9][0-9]*)([.][0-9]+)?([eE][+-]?[0-9]+)?$".matchRegexp(token).not) { pos = start; this.prFail("malformed number") };
 		asFloat = token.asFloat;
 		if(token.any { |c| ".eE".includes(c) } or: { asFloat.abs > 2147483647 }) { ^asFloat };
 		^token.asInteger
