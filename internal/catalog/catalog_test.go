@@ -127,6 +127,20 @@ func newEnv(t *testing.T, url string, k testKey) env {
 	}
 }
 
+// expireSaved ages the saved package list past MaxAge, so the next Load must
+// ask the server. File times are too coarse for a tiny MaxAge to do this.
+func (e env) expireSaved(t *testing.T) { e.setSavedTime(t, time.Now().Add(-2*defaultMaxAge)) }
+
+// setSavedTime sets the file time of the saved index, which Load reads as
+// "when the list was saved".
+func (e env) setSavedTime(t *testing.T, when time.Time) {
+	t.Helper()
+	path := filepath.Join(urlDir(e.opts), indexFile)
+	if err := os.Chtimes(path, when, when); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func (e env) load() error {
 	_, err := Load(context.Background(), e.client, e.opts)
 	return err
@@ -251,7 +265,7 @@ func TestLoadRejectsRollback(t *testing.T) {
 		t.Fatal(err)
 	}
 	srv.set(signed(t, k[0], indexJSON(t1, ""))) // validly signed, but older
-	e.opts.MaxAge = time.Nanosecond
+	e.expireSaved(t)
 	// The replay is refused (the reason is logged) and the verified T2 pair is used.
 	if got := e.loadedGenerated(t); !got.Equal(mustTime(t2)) {
 		t.Errorf("generated = %v; want %s", got, t2)
@@ -273,7 +287,7 @@ func TestLoadAcceptsSameGeneratedTime(t *testing.T) {
 	srv := newServer(t, nil, nil)
 	srv.set(signed(t, k[0], indexJSON(t2, "")))
 	e := newEnv(t, srv.url(), k[0])
-	e.opts.MaxAge = time.Nanosecond
+	e.expireSaved(t)
 	for i := 0; i < 2; i++ {
 		if err := e.load(); err != nil {
 			t.Fatal(err)
@@ -307,7 +321,7 @@ func TestLoadNetworkFailureUsesVerifiedCache(t *testing.T) {
 		t.Fatal(err)
 	}
 	srv.Close()
-	e.opts.MaxAge = time.Nanosecond
+	e.expireSaved(t)
 	if err := e.load(); err != nil {
 		t.Fatal(err)
 	}
@@ -328,7 +342,7 @@ func TestLoadNeverMixesFreshIndexWithCachedSignature(t *testing.T) {
 	idx, _ := signed(t, k[0], indexJSON(t2, ""))
 	srv.set(idx, []byte("stale"))
 	srv.breakSig()
-	e.opts.MaxAge = time.Nanosecond
+	e.expireSaved(t)
 	ix, err := Load(context.Background(), e.client, e.opts)
 	if err != nil {
 		t.Fatal(err)
@@ -399,7 +413,7 @@ func TestLoadBrokenSignatureKeepsGoodPairForOffline(t *testing.T) {
 	idx, _ := signed(t, k[0], indexJSON(t2, ""))
 	srv.set(idx, nil)
 	srv.breakSig()
-	e.opts.MaxAge = time.Nanosecond
+	e.expireSaved(t)
 	if err := e.load(); err != nil {
 		t.Fatal(err)
 	}
@@ -418,7 +432,7 @@ func TestLoadCaptivePortalFallsBackToVerifiedPair(t *testing.T) {
 		t.Fatal(err)
 	}
 	srv.set([]byte("<html>please log in</html>"), []byte("<html>please log in</html>"))
-	e.opts.MaxAge = time.Nanosecond
+	e.expireSaved(t)
 	if got := e.loadedGenerated(t); !got.Equal(mustTime(t1)) {
 		t.Errorf("generated = %v; want %s", got, t1)
 	}
@@ -433,5 +447,23 @@ func TestLoadPortalWithoutSavedPairFails(t *testing.T) {
 	e := newEnv(t, srv.url(), k[0])
 	if err := e.load(); err == nil || !strings.Contains(err.Error(), "signature") {
 		t.Fatalf("got %v", err)
+	}
+}
+
+func TestLoadSavedPairFromTheFutureIsNotFresh(t *testing.T) {
+	k := testKeys()
+	srv := newServer(t, nil, nil)
+	srv.set(signed(t, k[0], indexJSON(t1, "")))
+	e := newEnv(t, srv.url(), k[0])
+	if err := e.load(); err != nil {
+		t.Fatal(err)
+	}
+	srv.Close()
+	e.setSavedTime(t, time.Now().Add(24*time.Hour)) // the clock was wrong when it was saved
+	if err := e.load(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(e.log.String(), "could not reach the server.") {
+		t.Errorf("the server was not asked; log = %q", e.log.String())
 	}
 }

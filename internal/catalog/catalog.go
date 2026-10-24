@@ -67,7 +67,7 @@ func Load(ctx context.Context, f *fetch.Client, o Options) (*index.Index, error)
 		}
 		return check(saved, o)
 	}
-	if haveSaved && !local && time.Since(savedAt) < maxAge(o) {
+	if haveSaved && !local && isFresh(savedAt, o) {
 		if ix, err := check(saved, o); err == nil {
 			return ix, nil
 		}
@@ -93,6 +93,13 @@ func Load(ctx context.Context, f *fetch.Client, o Options) (*index.Index, error)
 		return nil, err
 	}
 	return ix, nil
+}
+
+// isFresh says whether a list saved at savedAt may be used without asking the
+// server. A file time in the future (the clock was wrong) is never fresh.
+func isFresh(savedAt time.Time, o Options) bool {
+	age := time.Since(savedAt)
+	return age >= 0 && age < maxAge(o)
 }
 
 func maxAge(o Options) time.Duration {
