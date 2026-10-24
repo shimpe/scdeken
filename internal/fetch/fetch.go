@@ -16,6 +16,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/shimpe/scdeken/internal/robust"
 )
 
 const (
@@ -101,6 +103,9 @@ func (c *Client) Cached(rawURL string) ([]byte, time.Time, bool) {
 	return body, info.ModTime(), true
 }
 
+// writeFile saves cache files; tests replace it to make a write fail.
+var writeFile = robust.WriteFile
+
 // store caches a body and its ETag. Cache problems never fail a fetch.
 // The body is written first, and the ETag is removed if either write fails,
 // so a stored ETag never sits next to an older body (the worst case is a
@@ -110,11 +115,11 @@ func (c *Client) store(rawURL string, body []byte, etag string) {
 		return
 	}
 	etagPath := c.path(rawURL, "etag")
-	if writeAtomic(c.path(rawURL, "body"), body) != nil || etag == "" {
+	if writeFile(c.path(rawURL, "body"), body, 0o644) != nil || etag == "" {
 		_ = os.Remove(etagPath)
 		return
 	}
-	if writeAtomic(etagPath, []byte(etag)) != nil {
+	if writeFile(etagPath, []byte(etag), 0o644) != nil {
 		_ = os.Remove(etagPath)
 	}
 }
@@ -122,20 +127,6 @@ func (c *Client) store(rawURL string, body []byte, etag string) {
 func (c *Client) path(rawURL, ext string) string {
 	sum := sha256.Sum256([]byte(rawURL))
 	return filepath.Join(c.CacheDir, hex.EncodeToString(sum[:])+"."+ext)
-}
-
-// writeAtomic writes data to a temp file and renames it into place.
-func writeAtomic(path string, data []byte) error {
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
-		_ = os.Remove(tmp)
-		return err
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		_ = os.Remove(tmp)
-		return err
-	}
-	return nil
 }
 
 func (c *Client) newRequest(ctx context.Context, rawURL string) (*http.Request, error) {
@@ -150,37 +141,39 @@ func (c *Client) newRequest(ctx context.Context, rawURL string) (*http.Request, 
 }
 
 // Download saves rawURL to dst, but only if its SHA-256 equals sha256hex.
-// The bytes go to dst+".part" first; on any failure that file is removed, so
-// dst never holds an unverified or partial download. progress may be nil;
-// total is -1 until the end when the size is unknown.
+// The bytes go to a partial file of this call's own next to dst first; on
+// any failure that file is removed, so dst never holds an unverified or
+// partial download. progress may be nil; total is -1 until the end when the
+// size is unknown.
 func (c *Client) Download(ctx context.Context, rawURL, dst, sha256hex string, progress func(done, total int64)) error {
-	part := dst + ".part"
-	if err := c.downloadTo(ctx, rawURL, part, sha256hex, progress); err != nil {
-		_ = os.Remove(part)
+	part, err := os.CreateTemp(filepath.Dir(dst), filepath.Base(dst)+"-*.part")
+	if err != nil {
 		return fmt.Errorf("download %s: %w", rawURL, err)
 	}
-	if err := os.Rename(part, dst); err != nil {
-		_ = os.Remove(part)
+	err = c.downloadTo(ctx, rawURL, part, sha256hex, progress)
+	if err == nil {
+		err = robust.Rename(part.Name(), dst)
+	}
+	if err != nil {
+		_ = os.Remove(part.Name())
 		return fmt.Errorf("download %s: %w", rawURL, err)
 	}
 	return nil
 }
 
-func (c *Client) downloadTo(ctx context.Context, rawURL, part, sha256hex string, progress func(done, total int64)) error {
+// downloadTo writes rawURL to out, closes it and checks the SHA-256.
+func (c *Client) downloadTo(ctx context.Context, rawURL string, out *os.File, sha256hex string, progress func(done, total int64)) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	body, total, err := c.open(ctx, rawURL)
 	if err != nil {
+		out.Close()
 		return err
 	}
 	defer body.Close()
 	src := newIdleReader(body, idleTimeout, cancel)
 	defer src.timer.Stop()
 
-	out, err := os.Create(part)
-	if err != nil {
-		return err
-	}
 	hash := sha256.New()
 	var done int64
 	count := countWriter(func(n int) {

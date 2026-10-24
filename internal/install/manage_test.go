@@ -21,7 +21,7 @@ func setVersions(t *testing.T, s *Service, name string, rels ...index.Release) {
 	p.Versions = rels
 }
 
-// installManaged puts a fake managed fmx6 on disk and in the state.
+// installManaged puts a fake managed fmx6 on disk and in the state file.
 func installManaged(t *testing.T, s *Service, version string) string {
 	t.Helper()
 	dir := filepath.Join(s.Paths.Managed, "fmx6")
@@ -29,6 +29,9 @@ func installManaged(t *testing.T, s *Service, version string) string {
 	s.State.Packages["fmx6"] = state.Entry{
 		Name: "fmx6", Version: version, Commit: fmx6Commit, Kind: "plugin",
 		Path: dir, Route: state.Prebuilt, Repo: "https://github.com/example/fmx6",
+	}
+	if err := s.State.Save(s.Paths.State); err != nil {
+		t.Fatal(err)
 	}
 	return dir
 }
@@ -139,5 +142,31 @@ func TestQuarantineRejectsBadID(t *testing.T) {
 	}
 	if !exists(dir) || exists(s.Paths.Quarantine) {
 		t.Error("nothing may move for a bad id")
+	}
+}
+
+func TestRemoveKeepsWhatAnotherProcessSaved(t *testing.T) {
+	s := applyService(t)
+	installManaged(t, s, "1.0.0")
+	saveByAnotherProcess(t, s, "other")
+	if err := s.Remove("fmx6"); err != nil {
+		t.Fatal(err)
+	}
+	saved, err := state.Load(s.Paths.State)
+	if _, ok := saved.Packages["other"]; err != nil || !ok || len(saved.Packages) != 1 {
+		t.Errorf("saved = %+v, %v", saved, err)
+	}
+}
+
+func TestQuarantineKeepsWhatAnotherProcessSaved(t *testing.T) {
+	s := applyService(t)
+	dir := installManaged(t, s, "1.0.0")
+	saveByAnotherProcess(t, s, "other")
+	if _, err := s.Quarantine(dir, "SCD-2026-0001"); err != nil {
+		t.Fatal(err)
+	}
+	saved, err := state.Load(s.Paths.State)
+	if _, ok := saved.Packages["other"]; err != nil || !ok || len(saved.Packages) != 1 {
+		t.Errorf("saved = %+v, %v", saved, err)
 	}
 }

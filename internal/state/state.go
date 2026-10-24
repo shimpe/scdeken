@@ -1,5 +1,6 @@
-// Package state records what sc-deken installed. It is written atomically so
-// a crash never loses the last good copy.
+// Package state records what sc-deken installed. It is written atomically,
+// so a crash never loses the last good copy, and changed under a lock, so
+// two scdeken processes never undo each other's changes.
 package state
 
 import (
@@ -10,6 +11,9 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/shimpe/scdeken/internal/filelock"
+	"github.com/shimpe/scdeken/internal/robust"
 )
 
 // Route is how a package got onto the machine.
@@ -62,8 +66,9 @@ func Load(path string) (*State, error) {
 	return s, nil
 }
 
-// Save writes the state to path+".tmp", flushes it to disk, then renames it
-// over path, so readers see either the old or the new file, never half of one.
+// Save writes the state atomically (see robust.WriteFile): readers see
+// either the old or the new file, never half of one. Use Update to change
+// the state another scdeken process may be changing too.
 func (s *State) Save(path string) error {
 	data, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
@@ -72,29 +77,38 @@ func (s *State) Save(path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("create state folder: %w", err)
 	}
-	tmp := path + ".tmp"
-	if err := writeSynced(tmp, data); err != nil {
-		return fmt.Errorf("write state %s: %w", tmp, err)
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		return fmt.Errorf("replace state %s: %w", path, err)
+	if err := robust.WriteFile(path, data, 0o644); err != nil {
+		return fmt.Errorf("save state %s: %w", path, err)
 	}
 	return nil
 }
 
-// writeSynced writes data to a fresh file and fsyncs it before closing.
-func writeSynced(path string, data []byte) error {
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+// lockWait is how long Update waits for another scdeken process to finish
+// with the state file.
+const lockWait = 30 * time.Second
+
+// Update changes the state file at path while holding the lock file
+// state.lock next to it: it reads the latest saved state, lets change
+// modify it, saves it and returns it. So two scdeken processes that run at
+// the same time never undo each other's changes, as long as each change
+// touches only its own records.
+func Update(path string, change func(*State)) (*State, error) {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, fmt.Errorf("create state folder: %w", err)
+	}
+	unlock, err := filelock.Lock(filepath.Join(dir, "state.lock"), lockWait)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if _, err := f.Write(data); err != nil {
-		f.Close()
-		return err
+	defer unlock()
+	s, err := Load(path)
+	if err != nil {
+		return nil, err
 	}
-	if err := f.Sync(); err != nil {
-		f.Close()
-		return err
+	change(s)
+	if err := s.Save(path); err != nil {
+		return nil, err
 	}
-	return f.Close()
+	return s, nil
 }

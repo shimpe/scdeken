@@ -313,19 +313,19 @@ func (s *Service) record(p Plan, target string) error {
 	return s.save(entry)
 }
 
-// save stores entry in memory and on disk; memory is restored on failure.
+// save records entry in the state file.
 func (s *Service) save(entry state.Entry) error {
-	key := strings.ToLower(entry.Name)
-	prev, had := s.State.Packages[key]
-	s.State.Packages[key] = entry
-	if err := s.State.Save(s.Paths.State); err != nil {
-		if had {
-			s.State.Packages[key] = prev
-		} else {
-			delete(s.State.Packages, key)
-		}
+	return s.updateState(func(st *state.State) { st.Packages[strings.ToLower(entry.Name)] = entry })
+}
+
+// updateState applies change to the latest saved state, under the state
+// lock (see state.Update), and keeps the result. On failure nothing changes.
+func (s *Service) updateState(change func(*state.State)) error {
+	saved, err := state.Update(s.Paths.State, change)
+	if err != nil {
 		return err
 	}
+	s.State = saved
 	return nil
 }
 

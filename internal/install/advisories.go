@@ -3,10 +3,12 @@ package install
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/shimpe/scdeken/internal/advisory"
 	"github.com/shimpe/scdeken/internal/index"
+	"github.com/shimpe/scdeken/internal/state"
 	"github.com/shimpe/scdeken/internal/version"
 )
 
@@ -114,14 +116,12 @@ func (s *Service) advisoryPackage(a advisory.Advisory) (*index.Package, bool) {
 // Keep remembers that the user wants to keep the packages advisoryID
 // withdraws, so CheckAdvisories stops reporting it.
 func (s *Service) Keep(advisoryID string) error {
-	for _, id := range s.State.KeptAdvisories {
-		if id == advisoryID {
-			return nil
+	err := s.updateState(func(st *state.State) {
+		if !slices.Contains(st.KeptAdvisories, advisoryID) {
+			st.KeptAdvisories = append(st.KeptAdvisories, advisoryID)
 		}
-	}
-	s.State.KeptAdvisories = append(s.State.KeptAdvisories, advisoryID)
-	if err := s.State.Save(s.Paths.State); err != nil {
-		s.State.KeptAdvisories = s.State.KeptAdvisories[:len(s.State.KeptAdvisories)-1]
+	})
+	if err != nil {
 		return fmt.Errorf("remember kept advisory %s: %w", advisoryID, err)
 	}
 	return nil

@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/shimpe/scdeken/internal/install"
+	"github.com/shimpe/scdeken/internal/robust"
 	"github.com/shimpe/scdeken/internal/scenv"
 )
 
@@ -55,31 +55,11 @@ func readRequest(path string) (Request, error) {
 	return req, nil
 }
 
-// writeFileAtomic writes data to a temporary file next to path and renames it
-// into place, so a reader sees the old file or the whole new one.
+// writeFileAtomic writes data so that a reader sees the old file or the whole
+// new one (see robust.WriteFile).
 func writeFileAtomic(path string, data []byte) error {
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".result-*.tmp")
-	if err != nil {
+	if err := robust.WriteFile(path, data, 0o644); err != nil {
 		return fmt.Errorf("write %s: %w", path, err)
-	}
-	_, werr := tmp.Write(data)
-	cerr := tmp.Close()
-	if err := firstError(werr, cerr); err != nil {
-		os.Remove(tmp.Name())
-		return fmt.Errorf("write %s: %w", path, err)
-	}
-	if err := os.Rename(tmp.Name(), path); err != nil {
-		os.Remove(tmp.Name())
-		return fmt.Errorf("write %s: %w", path, err)
-	}
-	return nil
-}
-
-func firstError(errs ...error) error {
-	for _, err := range errs {
-		if err != nil {
-			return err
-		}
 	}
 	return nil
 }

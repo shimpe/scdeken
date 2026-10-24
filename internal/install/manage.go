@@ -198,15 +198,9 @@ func (s *Service) removable(name string) (state.Entry, error) {
 	return entry, nil
 }
 
-// forget drops entry from the state file; memory is restored on failure.
+// forget drops entry from the state file.
 func (s *Service) forget(entry state.Entry) error {
-	key := strings.ToLower(entry.Name)
-	delete(s.State.Packages, key)
-	if err := s.State.Save(s.Paths.State); err != nil {
-		s.State.Packages[key] = entry
-		return err
-	}
-	return nil
+	return s.updateState(func(st *state.State) { delete(st.Packages, strings.ToLower(entry.Name)) })
 }
 
 // Quarantine moves the folder or file at path into the quarantine folder
@@ -230,25 +224,15 @@ func (s *Service) Quarantine(path, advisoryID string) (string, error) {
 	return dst, nil
 }
 
-// forgetPath drops every state entry installed at path and saves.
+// forgetPath drops every state entry installed at path.
 func (s *Service) forgetPath(path string) error {
-	var dropped []state.Entry
-	for key, e := range s.State.Packages {
-		if samePath(e.Path, path) {
-			dropped = append(dropped, e)
-			delete(s.State.Packages, key)
+	return s.updateState(func(st *state.State) {
+		for key, e := range st.Packages {
+			if samePath(e.Path, path) {
+				delete(st.Packages, key)
+			}
 		}
-	}
-	if len(dropped) == 0 {
-		return nil
-	}
-	if err := s.State.Save(s.Paths.State); err != nil {
-		for _, e := range dropped {
-			s.State.Packages[strings.ToLower(e.Name)] = e
-		}
-		return err
-	}
-	return nil
+	})
 }
 
 // samePath compares paths, ignoring case on Windows.

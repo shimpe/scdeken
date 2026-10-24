@@ -491,3 +491,28 @@ func TestSwapRestoresInterruptedLeftover(t *testing.T) {
 		t.Errorf("leftover not restored: %q, %v", got, err)
 	}
 }
+
+// saveByAnotherProcess records name in the state file behind the service's
+// back, as a second scdeken running at the same time would.
+func saveByAnotherProcess(t *testing.T, s *Service, name string) {
+	t.Helper()
+	if _, err := state.Update(s.Paths.State, func(st *state.State) {
+		st.Packages[name] = state.Entry{Name: name, Route: state.External, Path: "/elsewhere/" + name}
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestApplyKeepsWhatAnotherProcessSaved(t *testing.T) {
+	s := applyService(t)
+	url, sum := serveZip(t, map[string]string{"FMX6.scx": "binary"})
+	saveByAnotherProcess(t, s, "other")
+
+	if _, err := s.Apply(context.Background(), prebuiltPlan("fmx6", recipe.KindPlugin, url, sum)); err != nil {
+		t.Fatal(err)
+	}
+	saved, err := state.Load(s.Paths.State)
+	if err != nil || len(saved.Packages) != 2 || len(s.State.Packages) != 2 {
+		t.Errorf("saved %+v (%v), in memory %+v", saved, err, s.State)
+	}
+}

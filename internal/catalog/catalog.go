@@ -23,6 +23,7 @@ import (
 
 	"github.com/shimpe/scdeken/internal/fetch"
 	"github.com/shimpe/scdeken/internal/index"
+	"github.com/shimpe/scdeken/internal/robust"
 	"github.com/shimpe/scdeken/internal/sign"
 )
 
@@ -212,7 +213,7 @@ func commit(ix *index.Index, p pair, dir string, o Options) error {
 		name string
 		data []byte
 	}{{sigFile, p.sig}, {stateFile, stamp}, {indexFile, p.index}} {
-		if err := writeAtomic(filepath.Join(dir, w.name), w.data); err != nil {
+		if err := robust.WriteFile(filepath.Join(dir, w.name), w.data, 0o644); err != nil {
 			return fmt.Errorf("save package list in %s: %w", dir, err)
 		}
 	}
@@ -238,20 +239,6 @@ func checkRollback(dir string, generated time.Time) error {
 	if generated.Before(seen) {
 		return fmt.Errorf("The package list from the server (%s) is older than the one already seen (%s); refusing it in case someone is replaying an old list.",
 			generated.Format(time.RFC3339), seen.Format(time.RFC3339))
-	}
-	return nil
-}
-
-// writeAtomic writes data to a temp file and renames it into place.
-func writeAtomic(path string, data []byte) error {
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
-		_ = os.Remove(tmp)
-		return err
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		_ = os.Remove(tmp)
-		return err
 	}
 	return nil
 }

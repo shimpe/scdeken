@@ -1,9 +1,11 @@
 package state
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 )
@@ -59,8 +61,8 @@ func TestStateRoundTrip(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %+v, want %+v", got, want)
 	}
-	if _, err := os.Stat(path + ".tmp"); !os.IsNotExist(err) {
-		t.Error("tmp file left behind")
+	if entries, _ := os.ReadDir(filepath.Dir(path)); len(entries) != 1 {
+		t.Errorf("temporary file left behind: %v", entries)
 	}
 }
 
@@ -87,5 +89,52 @@ func TestSaveIsAtomic(t *testing.T) {
 	got, _ = Load(path)
 	if len(got.KeptAdvisories) != 0 {
 		t.Errorf("second save not applied: %+v", got)
+	}
+}
+
+func TestUpdateChangesOnlyWhatItTouches(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "state.json")
+	if err := sample().Save(path); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Update(path, func(s *State) { s.Packages["bar"] = Entry{Name: "Bar"} })
+	if err != nil {
+		t.Fatal(err)
+	}
+	saved, err := Load(path)
+	if err != nil || !reflect.DeepEqual(saved, got) {
+		t.Fatalf("saved %+v, returned %+v, %v", saved, got, err)
+	}
+	if len(saved.Packages) != 2 || saved.KeptAdvisories[0] != "SCD-1" {
+		t.Errorf("other records lost: %+v", saved)
+	}
+	if _, err := os.Stat(filepath.Join(filepath.Dir(path), "state.lock")); !os.IsNotExist(err) {
+		t.Errorf("lock left behind: %v", err)
+	}
+}
+
+// Two helpers running at once each add their own package; neither may undo
+// the other's change.
+func TestUpdateConcurrentChangesAllSurvive(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "sub", "state.json")
+	var wg sync.WaitGroup
+	errs := make([]error, 8)
+	for i := range errs {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			name := fmt.Sprintf("pkg%d", i)
+			_, errs[i] = Update(path, func(s *State) { s.Packages[name] = Entry{Name: name} })
+		}(i)
+	}
+	wg.Wait()
+	for i, err := range errs {
+		if err != nil {
+			t.Errorf("update %d: %v", i, err)
+		}
+	}
+	saved, err := Load(path)
+	if err != nil || len(saved.Packages) != len(errs) {
+		t.Errorf("saved %d packages (%v), want %d: %+v", len(saved.Packages), err, len(errs), saved)
 	}
 }

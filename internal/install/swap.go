@@ -5,14 +5,17 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/shimpe/scdeken/internal/robust"
 )
 
 // ErrInUse marks a package folder that cannot be replaced because
 // SuperCollider has files in it open.
 var ErrInUse = errors.New("in use")
 
-// rename moves files; tests replace it to simulate locked files.
-var rename = os.Rename
+// rename moves files, waiting out brief locks (see robust.Rename); tests
+// replace it to simulate files SuperCollider keeps open.
+var rename = robust.Rename
 
 // inUseError carries the musician-facing message and matches ErrInUse.
 type inUseError struct {

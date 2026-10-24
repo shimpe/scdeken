@@ -4,11 +4,14 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 )
@@ -99,10 +102,8 @@ func TestDownloadHashMismatchLeavesNothing(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "checksum") {
 		t.Fatalf("err = %v, want checksum error", err)
 	}
-	for _, p := range []string{dst, dst + ".part"} {
-		if _, statErr := os.Stat(p); !os.IsNotExist(statErr) {
-			t.Errorf("%s should not exist", p)
-		}
+	if entries, _ := os.ReadDir(filepath.Dir(dst)); len(entries) != 0 {
+		t.Errorf("left behind: %v", entries)
 	}
 }
 
@@ -165,9 +166,12 @@ func TestFailedBodyWriteLeavesNoETag(t *testing.T) {
 	if _, err := c.Get(context.Background(), srv.URL); err != nil {
 		t.Fatal(err)
 	}
-	// A directory where the temp file belongs makes the body write fail.
-	if err := os.Mkdir(c.path(srv.URL, "body")+".tmp", 0o755); err != nil {
-		t.Fatal(err)
+	// The next body write fails, as on a full disk.
+	real := writeFile
+	t.Cleanup(func() { writeFile = real })
+	writeFile = func(path string, data []byte, perm fs.FileMode) error {
+		writeFile = real
+		return errors.New("disk full")
 	}
 	if got, err := c.Get(context.Background(), srv.URL); err != nil || string(got) != "new" {
 		t.Fatalf("second Get = %q, %v", got, err)
@@ -177,5 +181,33 @@ func TestFailedBodyWriteLeavesNoETag(t *testing.T) {
 	}
 	if len(seen) != 3 || seen[1] != `"v1"` || seen[2] != "" {
 		t.Errorf("If-None-Match per request = %q, want [\"\" \"v1\" \"\"]", seen)
+	}
+}
+
+// Two installs of the same package at once download to the same file; each
+// needs its own partial file so neither trips over the other.
+func TestConcurrentDownloadsToOneFileAllSucceed(t *testing.T) {
+	body := []byte(strings.Repeat("archive bytes ", 50000))
+	srv := serveBody(body)
+	defer srv.Close()
+	dst := filepath.Join(t.TempDir(), "a.zip")
+	c := New(t.TempDir())
+	var wg sync.WaitGroup
+	errs := make([]error, 6)
+	for i := range errs {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			errs[i] = c.Download(context.Background(), srv.URL, dst, sum(body), nil)
+		}(i)
+	}
+	wg.Wait()
+	for i, err := range errs {
+		if err != nil {
+			t.Errorf("download %d: %v", i, err)
+		}
+	}
+	if entries, _ := os.ReadDir(filepath.Dir(dst)); len(entries) != 1 {
+		t.Errorf("folder holds %v, want only a.zip", entries)
 	}
 }
