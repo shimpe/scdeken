@@ -170,3 +170,61 @@ func TestParseSums(t *testing.T) {
 		t.Errorf("sums = %v", got)
 	}
 }
+
+// sourceFailureSetup writes a recipes folder with one plugin-less recipe and
+// returns the arguments of an index build whose sources the test can break.
+func sourceFailureSetup(t *testing.T, gh *httptest.Server) (args []string, out string) {
+	t.Helper()
+	dir := t.TempDir()
+	recipes := filepath.Join(dir, "recipes")
+	os.Mkdir(recipes, 0o755)
+	os.WriteFile(filepath.Join(recipes, "Thing.toml"), []byte(quarkRecipe), 0o644)
+	directory := filepath.Join(dir, "directory.txt")
+	os.WriteFile(directory, nil, 0o644)
+	out = filepath.Join(dir, "index.json")
+	return []string{"index", "build", "--recipes", recipes, "--directory", directory, "--releases-repo", "o/r", "--out", out}, out
+}
+
+func runFailingBuild(t *testing.T, handler http.HandlerFunc, wantInError string) {
+	t.Helper()
+	gh := httptest.NewServer(handler)
+	defer gh.Close()
+	args, out := sourceFailureSetup(t, gh)
+	runner := &run.Fake{Script: map[string]run.FakeResult{"git *": {}}}
+	code, _, errOut := runMain(t, Deps{Runner: runner, GitHubURL: gh.URL}, args...)
+	if code != 1 || !strings.Contains(errOut, wantInError) {
+		t.Errorf("exit %d, stderr: %s", code, errOut)
+	}
+	if _, err := os.Stat(out); err == nil {
+		t.Error("an index was written although a source could not be read")
+	}
+}
+
+func TestIndexBuildFailsWhenReleasesCannotBeListed(t *testing.T) {
+	runFailingBuild(t, func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/search/") {
+			io.WriteString(w, `{"items":[]}`)
+			return
+		}
+		http.Error(w, "boom", http.StatusInternalServerError)
+	}, "list the prebuilt releases")
+}
+
+func TestIndexBuildFailsWhenChecksumsCannotBeRead(t *testing.T) {
+	runFailingBuild(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/search/"):
+			io.WriteString(w, `{"items":[]}`)
+		case r.URL.Path == "/repos/o/r/releases":
+			io.WriteString(w, `[{"tag_name":"Thing-0.4.5","assets":[{"name":"SHA256SUMS","browser_download_url":"http://`+r.Host+`/missing","size":1}]}]`)
+		default:
+			http.NotFound(w, r)
+		}
+	}, "SHA256SUMS of release Thing-0.4.5")
+}
+
+func TestIndexBuildFailsWhenATopicSearchFails(t *testing.T) {
+	runFailingBuild(t, func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "rate limited", http.StatusForbidden)
+	}, "search topic")
+}

@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/sc-deken/sc-deken/internal/advisory"
 	"github.com/sc-deken/sc-deken/internal/discover"
 	"github.com/sc-deken/sc-deken/internal/index"
 	"github.com/sc-deken/sc-deken/internal/recipe"
@@ -30,8 +31,9 @@ func (b *builder) discovered(ctx context.Context, c candidate) (index.Package, b
 		return index.Package{}, false
 	}
 	pkg := index.Package{
-		Name: firstNonEmpty(c.name, info.Name, repoName(c.url)), Summary: info.Summary,
-		Repo: c.url, License: info.License, Kind: kind, Trust: c.trust,
+		Name: firstNonEmpty(c.name, info.QuarkName, repoName(c.url)), Summary: info.QuarkSummary,
+		Repo: c.url, Kind: kind, Trust: c.trust,
+		QuarkName: info.QuarkName, QuarkSummary: info.QuarkSummary, LicenseFile: info.LicenseFile,
 		Classes: info.Classes, UGens: info.UGens, Build: info.Build, Versions: versions,
 	}
 	if scanned {
@@ -41,18 +43,45 @@ func (b *builder) discovered(ctx context.Context, c candidate) (index.Package, b
 	return pkg, true
 }
 
-// discoveredKind decides the kind of a found package. Quarks from the
-// directory are quarks even when a scan failed; a topic repository must prove
-// itself to be a plugin or quark.
+// discoveredKind decides the kind of a found package: what the scan saw, else
+// for quarks from the directory "quark", else what the repository's GitHub
+// topics say. A package whose kind comes from topics has no build
+// description, so it is listed for information only.
 func (b *builder) discoveredKind(c candidate, info scanInfo) (recipe.Kind, bool) {
-	switch {
-	case info.Kind != "":
+	if info.Kind != "" {
 		return info.Kind, true
-	case c.trust == index.Community:
+	}
+	if c.trust == index.Community {
 		return recipe.KindQuark, true
+	}
+	if kind := kindFromTopics(b.meta[advisory.NormalizeRepo(c.url)].Topics); kind != "" {
+		return kind, true
 	}
 	b.logf("skipping %s: it does not look like a SuperCollider plugin or quark", c.url)
 	return "", false
+}
+
+// kindFromTopics maps the topics searched by the indexer to a kind: the quark
+// topic means quark, the plugin topics mean plugin, both mean plugin+quark.
+func kindFromTopics(topics []string) recipe.Kind {
+	var quark, plugin bool
+	for _, t := range topics {
+		switch t {
+		case QuarkTopic:
+			quark = true
+		case "supercollider-plugin", "supercollider-plugins", "supercollider-ugens":
+			plugin = true
+		}
+	}
+	switch {
+	case quark && plugin:
+		return recipe.KindPluginQuark
+	case quark:
+		return recipe.KindQuark
+	case plugin:
+		return recipe.KindPlugin
+	}
+	return ""
 }
 
 // discoveredVersions turns upstream tags into releases, newest first. A
@@ -90,9 +119,9 @@ func discoveredVersions(head string, tags map[string]string) []index.Release {
 
 // scanInfo is what the index keeps from looking inside a repository.
 type scanInfo struct {
-	Name           string
-	Summary        string
-	License        string
+	QuarkName      string // name in the .quark file
+	QuarkSummary   string // summary in the .quark file
+	LicenseFile    string // SPDX guess from the license file
 	Kind           recipe.Kind
 	Build          *recipe.Build
 	Classes, UGens []string
@@ -103,10 +132,12 @@ type scanInfo struct {
 // there was nothing to scan or the scan failed; the package is then kept
 // without scan results.
 //
-// The previous index is only a cache of scan results. A reviewed package's
-// kind, build and summary come from its recipe, so for those (reviewed=true)
-// callers use only classes and UGens; and a cached reviewed entry never
-// stands in for a non-reviewed one.
+// The previous index is only a cache of scan results: classes, UGens, kind,
+// build description and the quark-file and license-file findings. Names,
+// summaries and licenses are worked out again every run from those and the
+// current GitHub data. A reviewed package's kind and build come from its
+// recipe, so for those (reviewed=true) callers use only classes and UGens;
+// and a cached reviewed entry never stands in for a non-reviewed one.
 func (b *builder) inspect(ctx context.Context, url, commit string, reviewed bool) (scanInfo, bool) {
 	if commit == "" {
 		return scanInfo{}, false
@@ -131,14 +162,14 @@ func (b *builder) cached(url, commit string, reviewed bool) (scanInfo, bool) {
 		return scanInfo{}, false
 	}
 	return scanInfo{
-		Name: prev.Name, Summary: prev.Summary, License: prev.License, Kind: prev.Kind,
-		Build: prev.Build, Classes: prev.Classes, UGens: prev.UGens,
+		QuarkName: prev.QuarkName, QuarkSummary: prev.QuarkSummary, LicenseFile: prev.LicenseFile,
+		Kind: prev.Kind, Build: prev.Build, Classes: prev.Classes, UGens: prev.UGens,
 	}, true
 }
 
 func infoFromScan(s discover.Scan) scanInfo {
 	info := scanInfo{
-		Name: s.Quark.Name, Summary: s.Quark.Summary, License: s.LicenseFile,
+		QuarkName: s.Quark.Name, QuarkSummary: s.Quark.Summary, LicenseFile: s.LicenseFile,
 		Kind: s.Kind, Classes: s.Classes, UGens: s.UGens,
 	}
 	if s.CMakeDir != "" {

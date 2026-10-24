@@ -226,7 +226,7 @@ func TestBuildSkipsArchivedUnlessReviewed(t *testing.T) {
 func previousWith(url string) *index.Index {
 	return &index.Index{Schema: 1, Packages: []index.Package{{
 		Name: "Q", Repo: url, Kind: recipe.KindPlugin, Trust: index.Community, ScannedCommit: sha9,
-		Summary: "cached summary", Classes: []string{"Cached"}, UGens: []string{"CachedUGen"},
+		Summary: "stale summary", License: "STALE", QuarkSummary: "quark summary", LicenseFile: "MIT", Classes: []string{"Cached"}, UGens: []string{"CachedUGen"},
 		Build:    &recipe.Build{System: "cmake", SCPathVar: "SC_PATH"},
 		Versions: []index.Release{{Version: "9.9.9", Commit: sha0, Builds: []index.Build{{Platform: "linux-x86_64-api3", SHA256: "evil"}}}},
 	}}}
@@ -243,8 +243,11 @@ func TestBuildReusesPreviousScan(t *testing.T) {
 		t.Errorf("scanned %v although the previous index knew this commit", s.scanned)
 	}
 	p := pkgNamed(t, ix, "Q")
-	if len(p.Classes) != 1 || p.Classes[0] != "Cached" || p.Kind != recipe.KindPlugin || p.Build == nil || p.Summary != "cached summary" {
+	if len(p.Classes) != 1 || p.Classes[0] != "Cached" || p.Kind != recipe.KindPlugin || p.Build == nil {
 		t.Errorf("cached scan not reused: %+v", p)
+	}
+	if p.Summary != "quark summary" || p.License != "MIT" {
+		t.Errorf("summary and license must be worked out again from the scan findings: %q, %q", p.Summary, p.License)
 	}
 	if len(p.Versions) != 1 || p.Versions[0].Version != "1.0" || len(p.Versions[0].Builds) != 0 {
 		t.Errorf("versions must come from upstream tags only: %+v", p.Versions)
@@ -367,5 +370,61 @@ func TestCIMatrix(t *testing.T) {
 	}
 	if _, err := Matrix(context.Background(), run.Exec{}, recipes, "no-such-ref"); err == nil {
 		t.Error("an unknown base revision was accepted")
+	}
+}
+
+func TestBuildPreviousDoesNotFreezeMetadata(t *testing.T) {
+	url := "https://github.com/a/q"
+	s := &fakeScanner{refs: map[string]fakeRefs{url: {head: sha9}}}
+	prev := previousWith(url)
+	prev.Packages[0].QuarkSummary = ""
+	ix := build(t, s, Inputs{
+		Directory: []discover.Entry{{Name: "Q", URL: url}},
+		Meta:      map[string]github.Repo{url: {Description: "new description", License: "Apache-2.0"}},
+		Previous:  prev,
+	})
+	p := pkgNamed(t, ix, "Q")
+	if len(s.scanned) != 0 || p.Summary != "new description" || p.License != "Apache-2.0" {
+		t.Errorf("scanned %v, summary %q, license %q", s.scanned, p.Summary, p.License)
+	}
+}
+
+func TestBuildReviewedKeepsRecipeValuesOverPrevious(t *testing.T) {
+	r := fmxRecipe()
+	prev := &index.Index{Schema: 1, Packages: []index.Package{{
+		Name: "fmx6", Repo: fmxURL, Kind: recipe.KindQuark, Trust: index.Community, Summary: "old", ScannedCommit: sha1,
+		Classes: []string{"Cached"}, Build: &recipe.Build{System: "cmake", Subdir: "evil"},
+	}}}
+	ix := build(t, &fakeScanner{}, Inputs{Recipes: []recipe.Recipe{r}, Previous: prev})
+	p := pkgNamed(t, ix, "fmx6")
+	if p.Kind != recipe.KindPlugin || p.Summary != "Six operator FM" || p.Build.Subdir != "" || p.Trust != index.Reviewed {
+		t.Errorf("recipe values lost: %+v", p)
+	}
+	if len(p.Classes) != 1 || p.Classes[0] != "Cached" {
+		t.Errorf("classes were not reused: %+v", p.Classes)
+	}
+}
+
+func TestBuildTopicRepoKeepsKindFromTopics(t *testing.T) {
+	both, quark, other := "https://github.com/a/both", "https://github.com/a/quarky", "https://github.com/a/other"
+	s := &fakeScanner{
+		refs:    map[string]fakeRefs{both: {head: sha1}, quark: {head: sha1}, other: {head: sha1}},
+		scanErr: map[string]error{both: errors.New("clone failed")},
+		scans:   map[string]discover.Scan{quark: {}}, // scanned fine but nothing recognisable
+	}
+	ix := build(t, s, Inputs{Topics: []github.Repo{
+		{HTMLURL: both, Description: "both kinds", Topics: []string{"supercollider-ugens", "supercollider-quark"}},
+		{HTMLURL: quark, Description: "a quark", Topics: []string{"supercollider-quark"}},
+		{HTMLURL: other, Topics: []string{"audio"}},
+	}})
+	if len(ix.Packages) != 2 {
+		t.Fatalf("packages = %+v", ix.Packages)
+	}
+	p := pkgNamed(t, ix, "both")
+	if p.Kind != recipe.KindPluginQuark || p.Build != nil || p.Summary != "both kinds" || p.Trust != index.Unreviewed {
+		t.Errorf("both = %+v", p)
+	}
+	if q := pkgNamed(t, ix, "quarky"); q.Kind != recipe.KindQuark {
+		t.Errorf("quarky = %+v", q)
 	}
 }

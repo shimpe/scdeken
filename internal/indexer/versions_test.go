@@ -1,7 +1,10 @@
 package indexer
 
 import (
+	"time"
+
 	"context"
+	"github.com/sc-deken/sc-deken/internal/run"
 	"strings"
 	"testing"
 
@@ -54,5 +57,30 @@ func TestNewVersionsOneBadRepoKeepsTheRest(t *testing.T) {
 	props, _, err := NewVersions(context.Background(), s, []recipe.Recipe{bad, good})
 	if len(props) != 1 || err == nil || !strings.Contains(err.Error(), "gone") {
 		t.Errorf("proposals %v, err %v", props, err)
+	}
+}
+
+// blockingRunner never finishes until its context ends.
+type blockingRunner struct{ run.Fake }
+
+func (b *blockingRunner) Output(ctx context.Context, c run.Cmd) (string, error) {
+	b.Calls = append(b.Calls, c)
+	<-ctx.Done()
+	return "", ctx.Err()
+}
+
+func TestGitScannerTimesOutAndDisablesPrompts(t *testing.T) {
+	r := &blockingRunner{}
+	g := GitScanner{Runner: r, Timeout: 20 * time.Millisecond}
+	start := time.Now()
+	if _, _, err := g.Refs(context.Background(), "https://github.com/a/slow"); err == nil {
+		t.Fatal("a repository that never answers did not fail")
+	}
+	if time.Since(start) > 5*time.Second {
+		t.Error("the timeout did not stop the call")
+	}
+	env := strings.Join(r.Calls[0].Env, "\n")
+	if !strings.Contains(env, "GIT_TERMINAL_PROMPT=0") || !strings.Contains(env, "GCM_INTERACTIVE=never") {
+		t.Errorf("git may prompt for passwords; env lacks the switches")
 	}
 }

@@ -51,7 +51,10 @@ type Package struct {
 	ScannedCommit string                        `json:"scanned_commit"`
 	Classes       []string                      `json:"classes,omitempty"`
 	UGens         []string                      `json:"ugens,omitempty"`
-	PluginFiles   []string                      `json:"plugin_files,omitempty"` // e.g. "FMX6.scx", "FMX6_supernova.scx"
+	QuarkName     string                        `json:"quark_name,omitempty"`    // scan result: name in the .quark file
+	QuarkSummary  string                        `json:"quark_summary,omitempty"` // scan result: summary in the .quark file
+	LicenseFile   string                        `json:"license_file,omitempty"`  // scan result: SPDX guess from the license file
+	PluginFiles   []string                      `json:"plugin_files,omitempty"`  // e.g. "FMX6.scx", "FMX6_supernova.scx"
 	Depends       map[string]string             `json:"depends,omitempty"`
 	Build         *recipe.Build                 `json:"build,omitempty"`
 	Requires      map[string]recipe.Requirement `json:"requires,omitempty"`

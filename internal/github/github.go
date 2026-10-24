@@ -28,6 +28,7 @@ type Repo struct {
 	Stars                                                   int
 	PushedAt                                                time.Time
 	Archived                                                bool
+	Topics                                                  []string // GitHub topics; SearchTopic adds the one it searched for
 }
 
 // Asset is one downloadable file attached to a release.
@@ -55,7 +56,7 @@ func (c *Client) SearchTopic(ctx context.Context, topic string) ([]Repo, error) 
 			return err
 		}
 		for _, it := range page.Items {
-			repos = append(repos, it.repo())
+			repos = append(repos, withTopic(it.repo(), topic))
 		}
 		return nil
 	})
@@ -107,6 +108,7 @@ type repoJSON struct {
 	License       *struct {
 		SPDXID string `json:"spdx_id"`
 	} `json:"license"`
+	Topics   []string  `json:"topics"`
 	Stars    int       `json:"stargazers_count"`
 	PushedAt time.Time `json:"pushed_at"`
 	Archived bool      `json:"archived"`
@@ -116,7 +118,7 @@ func (j repoJSON) repo() Repo {
 	r := Repo{
 		FullName: j.FullName, HTMLURL: j.HTMLURL, CloneURL: j.CloneURL,
 		Description: j.Description, DefaultBranch: j.DefaultBranch,
-		Stars: j.Stars, PushedAt: j.PushedAt, Archived: j.Archived,
+		Stars: j.Stars, PushedAt: j.PushedAt, Archived: j.Archived, Topics: j.Topics,
 	}
 	if j.License != nil && j.License.SPDXID != "NOASSERTION" {
 		r.License = j.License.SPDXID
@@ -215,4 +217,16 @@ func nextLink(header string) string {
 		return m[1]
 	}
 	return ""
+}
+
+// withTopic makes sure r lists topic, which the search proved it has even
+// when the API left the topics out of the answer.
+func withTopic(r Repo, topic string) Repo {
+	for _, t := range r.Topics {
+		if t == topic {
+			return r
+		}
+	}
+	r.Topics = append(append([]string(nil), r.Topics...), topic)
+	return r
 }

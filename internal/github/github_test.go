@@ -77,3 +77,20 @@ func TestRateLimitHint(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+func TestSearchTopicRecordsTopics(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"items":[{"full_name":"a/one","topics":["supercollider-quark","audio"]},{"full_name":"b/two"}]}`)
+	}))
+	defer srv.Close()
+	repos, err := (&Client{BaseURL: srv.URL}).SearchTopic(context.Background(), "supercollider-quark")
+	if err != nil || len(repos) != 2 {
+		t.Fatalf("%v %v", repos, err)
+	}
+	if got := strings.Join(repos[0].Topics, ","); got != "supercollider-quark,audio" {
+		t.Errorf("topics from the API = %q", got)
+	}
+	if got := strings.Join(repos[1].Topics, ","); got != "supercollider-quark" {
+		t.Errorf("topic from the search = %q", got)
+	}
+}

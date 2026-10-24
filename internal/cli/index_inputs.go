@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -20,12 +21,11 @@ import (
 	"github.com/sc-deken/sc-deken/internal/recipe"
 )
 
-// topics are the GitHub topics whose repositories become unreviewed packages.
-var topics = []string{"supercollider-quark", "supercollider-plugin", "supercollider-plugins", "supercollider-ugens"}
-
-// gatherInputs reads and downloads everything "index build" needs. Local
-// files must be valid; anything fetched from the network that fails is logged
-// and left out, so one outage does not stop the nightly run.
+// gatherInputs reads and downloads everything "index build" needs. Every source
+// must be readable: if the recipes repository's releases, the quarks directory
+// or a topic search cannot be read the run fails, so yesterday's signed index
+// stays published instead of being replaced by a thinner one. Only the extras
+// (the previous index, GitHub details of single repositories) may be missing.
 func gatherInputs(ctx context.Context, m MaintainerArgs, s *session) (indexer.Inputs, error) {
 	in := indexer.Inputs{Now: s.deps.Now(), Log: s.log}
 	var err error
@@ -55,10 +55,14 @@ func gatherInputs(ctx context.Context, m MaintainerArgs, s *session) (indexer.In
 	if in.Directory, err = g.directory(ctx, m.Directory, m.Limit); err != nil {
 		return in, err
 	}
-	in.Topics = g.topics(ctx, m.Limit)
+	if in.Topics, err = g.topics(ctx, m.Limit); err != nil {
+		return in, err
+	}
 	in.Meta = g.meta(ctx, in)
 	if m.ReleasesRepo != "" {
-		g.releases(ctx, m.ReleasesRepo, &in)
+		if err := g.releases(ctx, m.ReleasesRepo, &in); err != nil {
+			return in, err
+		}
 	}
 	return in, nil
 }
@@ -132,24 +136,36 @@ func (g gatherer) directory(ctx context.Context, where string, limit int) ([]dis
 	return firstN(discover.ParseDirectory(string(data)), limit), nil
 }
 
-// topics searches GitHub for every topic and merges the answers.
-func (g gatherer) topics(ctx context.Context, limit int) []github.Repo {
-	seen := map[string]bool{}
+// topics searches GitHub for every topic and merges the answers; a repository
+// found under several topics keeps all of them.
+func (g gatherer) topics(ctx context.Context, limit int) ([]github.Repo, error) {
+	indexOf := map[string]int{}
 	var repos []github.Repo
-	for _, topic := range topics {
+	for _, topic := range indexer.Topics {
 		found, err := g.client.SearchTopic(ctx, topic)
 		if err != nil {
-			g.logf("Skipping topic %s: %v", topic, err)
-			continue
+			return nil, err
 		}
 		for _, r := range found {
-			if key := advisory.NormalizeRepo(r.HTMLURL); !seen[key] {
-				seen[key] = true
-				repos = append(repos, r)
+			key := advisory.NormalizeRepo(r.HTMLURL)
+			if i, seen := indexOf[key]; seen {
+				repos[i].Topics = mergeTopics(repos[i].Topics, r.Topics)
+				continue
 			}
+			indexOf[key] = len(repos)
+			repos = append(repos, r)
 		}
 	}
-	return firstN(repos, limit)
+	return firstN(repos, limit), nil
+}
+
+func mergeTopics(have, more []string) []string {
+	for _, t := range more {
+		if !slices.Contains(have, t) {
+			have = append(have, t)
+		}
+	}
+	return have
 }
 
 func firstN[T any](list []T, n int) []T {
@@ -193,61 +209,59 @@ func (g gatherer) meta(ctx context.Context, in indexer.Inputs) map[string]github
 
 // releases lists the prebuilt releases of the recipes repository and, for
 // the ones the recipes approve, downloads their checksums and file lists.
-func (g gatherer) releases(ctx context.Context, repo string, in *indexer.Inputs) {
+// Anything that cannot be read is an error: a missing checksum list would
+// silently drop every prebuilt download from the index.
+func (g gatherer) releases(ctx context.Context, repo string, in *indexer.Inputs) error {
 	all, err := g.client.Releases(ctx, repo)
 	if err != nil {
-		g.logf("No prebuilt releases: %v", err)
-		return
+		return fmt.Errorf("list the prebuilt releases: %w", err)
 	}
 	newest := map[string]bool{}
-	wanted := map[string]bool{}
 	for _, r := range in.Recipes {
 		for i, v := range r.ApprovedVersions() {
-			wanted[r.Name+"-"+v] = true
 			newest[r.Name+"-"+v] = i == 0
 		}
 	}
 	in.Sums, in.Files = map[string]map[string]string{}, map[string]map[string][]string{}
 	for _, rel := range all {
-		if !wanted[rel.Tag] {
+		isNewest, wanted := newest[rel.Tag]
+		if !wanted {
 			continue
 		}
 		in.Releases = append(in.Releases, rel)
-		g.readAssets(ctx, rel, newest[rel.Tag], in)
+		if err := g.readAssets(ctx, rel, isNewest, in); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // readAssets downloads SHA256SUMS and, for the newest version, the
 // <platform-key>.files.txt lists of one release.
-func (g gatherer) readAssets(ctx context.Context, rel github.Release, wantFiles bool, in *indexer.Inputs) {
+func (g gatherer) readAssets(ctx context.Context, rel github.Release, wantFiles bool, in *indexer.Inputs) error {
 	for _, a := range rel.Assets {
-		switch {
-		case a.Name == "SHA256SUMS":
-			if text, ok := g.text(ctx, rel.Tag, a); ok {
-				in.Sums[rel.Tag] = parseSums(text)
+		isFiles := strings.HasSuffix(a.Name, ".files.txt")
+		key := strings.TrimSuffix(a.Name, ".files.txt")
+		if _, keyErr := platform.ParseKey(key); keyErr != nil {
+			isFiles = false
+		}
+		if a.Name != "SHA256SUMS" && !(wantFiles && isFiles) {
+			continue
+		}
+		data, err := g.web.Get(ctx, a.URL)
+		if err != nil {
+			return fmt.Errorf("read %s of release %s: %w", a.Name, rel.Tag, err)
+		}
+		if isFiles {
+			if in.Files[rel.Tag] == nil {
+				in.Files[rel.Tag] = map[string][]string{}
 			}
-		case wantFiles && strings.HasSuffix(a.Name, ".files.txt"):
-			key := strings.TrimSuffix(a.Name, ".files.txt")
-			if _, err := platform.ParseKey(key); err != nil {
-				continue
-			}
-			if text, ok := g.text(ctx, rel.Tag, a); ok {
-				if in.Files[rel.Tag] == nil {
-					in.Files[rel.Tag] = map[string][]string{}
-				}
-				in.Files[rel.Tag][key] = strings.Fields(text)
-			}
+			in.Files[rel.Tag][key] = strings.Fields(string(data))
+		} else {
+			in.Sums[rel.Tag] = parseSums(string(data))
 		}
 	}
-}
-
-func (g gatherer) text(ctx context.Context, tag string, a github.Asset) (string, bool) {
-	data, err := g.web.Get(ctx, a.URL)
-	if err != nil {
-		g.logf("Cannot read %s of release %s: %v", a.Name, tag, err)
-		return "", false
-	}
-	return string(data), true
+	return nil
 }
 
 // parseSums reads sha256sum output: "<hex>  <name>" per line, where the name

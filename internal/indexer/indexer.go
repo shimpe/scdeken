@@ -41,10 +41,11 @@ type Inputs struct {
 	Files      map[string]map[string][]string // release tag → platform key → plugin file names (from <key>.files.txt assets)
 
 	// Previous is the last published index. It is a scan cache and nothing
-	// else: Build copies only what a scan of the same commit would give
-	// again (classes, UGens, and for non-reviewed packages kind, build
-	// description, summary and license). Versions, builds and checksums are
-	// never taken from it, so a bad old index cannot leak into a new one.
+	// else: when it scanned the same commit, Build copies the scan findings
+	// (classes, UGens, and for non-reviewed packages kind, build description,
+	// quark name/summary and license file). Names, summaries, licenses,
+	// versions, builds and checksums are never taken from it, so a bad or
+	// stale old index cannot leak into a new one.
 	Previous *index.Index
 
 	Now time.Time
@@ -165,9 +166,15 @@ func (b *builder) applyMeta(pkg *index.Package) {
 	m := b.meta[advisory.NormalizeRepo(pkg.Repo)]
 	pkg.Stars, pkg.Pushed = m.Stars, m.PushedAt
 	if pkg.License == "" {
-		pkg.License = m.License
+		pkg.License = firstNonEmpty(m.License, pkg.LicenseFile)
 	}
 	if pkg.Summary == "" {
-		pkg.Summary = m.Description
+		pkg.Summary = m.Description // after the recipe and the quark file
 	}
 }
+
+// QuarkTopic is the GitHub topic that marks a repository as a quark.
+const QuarkTopic = "supercollider-quark"
+
+// Topics are the GitHub topics whose repositories become unreviewed packages.
+var Topics = []string{QuarkTopic, "supercollider-plugin", "supercollider-plugins", "supercollider-ugens"}
