@@ -2,8 +2,8 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/sc-deken/sc-deken/internal/doctor"
@@ -138,24 +138,40 @@ func runInstall(ctx context.Context, req Request, s *session) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	plans := append(append([]install.Plan{}, plan.Depends...), plan)
+	if err := req.Choices.Validate(); err != nil {
+		return nil, err
+	}
+	if missing := missingAcross(plans, req.Choices); len(missing) > 0 {
+		return plan, &install.ConfirmationError{Needed: missing}
+	}
 	out := installed{Results: []install.Result{}}
-	for _, p := range append(append([]install.Plan{}, plan.Depends...), plan) {
+	for _, p := range plans {
 		res, err := svc.ApplyWith(ctx, p, req.Choices)
 		if err != nil {
-			return failedPlan(p, err), err
+			return nil, err
 		}
 		out.Results = append(out.Results, res)
 	}
 	return out, nil
 }
 
-// failedPlan returns the plan to show the user when it needs confirmation.
-func failedPlan(p install.Plan, err error) any {
-	var confirm *install.ConfirmationError
-	if errors.As(err, &confirm) {
-		return p
+// missingAcross returns the sorted, de-duplicated confirmations that the
+// choices leave open on any of the plans, so nothing is installed before
+// the user has answered for everything they were shown.
+func missingAcross(plans []install.Plan, c install.Choices) []string {
+	seen := map[string]bool{}
+	for _, p := range plans {
+		for _, m := range p.Missing(c) {
+			seen[m] = true
+		}
 	}
-	return nil
+	var all []string
+	for m := range seen {
+		all = append(all, m)
+	}
+	sort.Strings(all)
+	return all
 }
 
 func runRemove(_ context.Context, req Request, s *session) (any, error) {

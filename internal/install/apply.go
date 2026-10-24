@@ -49,11 +49,11 @@ func (s *Service) Apply(ctx context.Context, p Plan) (Result, error) {
 // ApplyWith carries out a plan. Files are built in a staging folder and
 // moved into place only when complete, so a failure leaves nothing behind.
 func (s *Service) ApplyWith(ctx context.Context, p Plan, c Choices) (Result, error) {
-	if err := checkChoice(c); err != nil {
+	if err := c.Validate(); err != nil {
 		return Result{}, err
 	}
-	if err := checkConfirmed(p, c); err != nil {
-		return Result{}, err
+	if missing := p.Missing(c); len(missing) > 0 {
+		return Result{}, &ConfirmationError{Needed: missing}
 	}
 	res := Result{Plan: p}
 	if p.Route == RouteQuark {
@@ -81,9 +81,9 @@ func (s *Service) ApplyWith(ctx context.Context, p Plan, c Choices) (Result, err
 	return res, nil
 }
 
-// checkChoice rejects an OnDuplicate answer that is neither empty, "replace"
+// Validate rejects an OnDuplicate answer that is neither empty, "replace"
 // nor "keep".
-func checkChoice(c Choices) error {
+func (c Choices) Validate() error {
 	switch c.OnDuplicate {
 	case "", "replace", "keep":
 		return nil
@@ -91,9 +91,9 @@ func checkChoice(c Choices) error {
 	return fmt.Errorf("unknown choice for existing copies: %q (use replace or keep)", c.OnDuplicate)
 }
 
-// checkConfirmed returns a ConfirmationError for every confirmation the plan
-// asks for that the choices do not give.
-func checkConfirmed(p Plan, c Choices) error {
+// Missing returns the confirmations this plan asks for (not those of its
+// Depends) that the choices do not give.
+func (p Plan) Missing(c Choices) []string {
 	given := map[string]bool{
 		ConfirmUnreviewed: c.ConfirmUnreviewed,
 		ConfirmRetracted:  c.ConfirmRetracted,
@@ -105,10 +105,7 @@ func checkConfirmed(p Plan, c Choices) error {
 			missing = append(missing, need)
 		}
 	}
-	if len(missing) > 0 {
-		return &ConfirmationError{Needed: missing}
-	}
-	return nil
+	return missing
 }
 
 // keepExisting records the user's own copy instead of installing.

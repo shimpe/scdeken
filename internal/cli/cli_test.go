@@ -87,10 +87,21 @@ func testIndex(zipURL, sum string) *index.Index {
 			Versions: []index.Release{{Version: "1.0.0", Commit: strings.Repeat("2", 40), Builds: builds}},
 		}
 	}
+	quark := func(name string, trust index.Trust, dep string) index.Package {
+		return index.Package{
+			Name: name, Repo: "https://github.com/example/" + name, Kind: recipe.KindQuark, Trust: trust,
+			Depends:  map[string]string{dep: "*"},
+			Versions: []index.Release{{Version: "1.0.0", Commit: strings.Repeat("3", 40)}},
+		}
+	}
 	return &index.Index{
 		Schema: index.SchemaVersion, Generated: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
 		SCVersions: []platform.SCVersion{{Version: "3.14.1", API: 3, Min: "3.13.0"}},
-		Packages:   []index.Package{mk("fmx6", index.Reviewed), mk("wild", index.Unreviewed)},
+		Packages: []index.Package{
+			mk("fmx6", index.Reviewed), mk("wild", index.Unreviewed),
+			quark("risky-app", index.Unreviewed, "fmx6"), // unreviewed main, reviewed dependency
+			quark("safe-app", index.Reviewed, "wild"),    // reviewed main, unreviewed dependency
+		},
 	}
 }
 
@@ -334,5 +345,53 @@ func TestVersionCommand(t *testing.T) {
 	_, out, _ := w.call(t, "version")
 	if d := decode(t, out).Data.(map[string]any); d["version"] != "dev" {
 		t.Errorf("data = %v", d)
+	}
+}
+
+// nothingInstalled reports whether the managed folder and state are untouched.
+func nothingInstalled(w *world) bool {
+	_, errDir := os.Stat(filepath.Join(w.ctx.ExtensionDir, "sc-deken"))
+	_, errState := os.Stat(filepath.Join(w.ctx.AppSupportDir, "sc-deken", "state.json"))
+	return os.IsNotExist(errDir) && os.IsNotExist(errState)
+}
+
+func TestInstallUnreviewedMainWritesNothingFirst(t *testing.T) {
+	w := newWorld(t)
+	code, out, _ := w.call(t, "install", "risky-app")
+	r := decode(t, out)
+	plan, _ := r.Data.(map[string]any)
+	if code != 3 || !reflect.DeepEqual(r.Confirm, []string{"unreviewed"}) || plan["package"] != "risky-app" {
+		t.Fatalf("exit %d, response %+v", code, r)
+	}
+	if !nothingInstalled(w) {
+		t.Error("the reviewed dependency was installed before the main package was confirmed")
+	}
+
+	code, out, errs := w.call(t, "install", "risky-app", "--yes-unreviewed")
+	results, _ := decode(t, out).Data.(map[string]any)["results"].([]any)
+	if code != 0 || len(results) != 2 {
+		t.Fatalf("exit %d, results %v, stderr %s", code, results, errs)
+	}
+	first := results[0].(map[string]any)["plan"].(map[string]any)["package"]
+	last := results[1].(map[string]any)["plan"].(map[string]any)["package"]
+	if first != "fmx6" || last != "risky-app" {
+		t.Errorf("order = %v, %v; want dependency first, main last", first, last)
+	}
+}
+
+func TestInstallUnreviewedDependencyNeedsConfirmation(t *testing.T) {
+	w := newWorld(t)
+	code, out, _ := w.call(t, "install", "safe-app")
+	r := decode(t, out)
+	plan, _ := r.Data.(map[string]any)
+	deps, _ := plan["depends"].([]any)
+	if code != 3 || !reflect.DeepEqual(r.Confirm, []string{"unreviewed"}) || plan["package"] != "safe-app" || len(deps) != 1 {
+		t.Fatalf("exit %d, response %+v", code, r)
+	}
+	if conf, _ := deps[0].(map[string]any)["confirm"].([]any); len(conf) != 1 || conf[0] != "unreviewed" {
+		t.Errorf("dependency plan does not carry its own confirm list: %v", deps[0])
+	}
+	if !nothingInstalled(w) {
+		t.Error("something was installed before the dependency was confirmed")
 	}
 }
