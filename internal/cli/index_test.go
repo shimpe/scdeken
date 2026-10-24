@@ -68,6 +68,10 @@ func TestAdvisoriesValidate(t *testing.T) {
 	if code != 1 || !strings.Contains(errOut, "b.toml") {
 		t.Errorf("invalid dir: exit %d: %s", code, errOut)
 	}
+	code, _, errOut = runMain(t, Deps{}, "advisories", "validate", "--dir", filepath.Join(dir, "missing"))
+	if code != 1 || !strings.Contains(errOut, "advisories folder") {
+		t.Errorf("missing dir: exit %d: %s", code, errOut)
+	}
 }
 
 func TestKeygenSignRoundTrip(t *testing.T) {

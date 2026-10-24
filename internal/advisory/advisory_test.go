@@ -149,3 +149,26 @@ func TestMatch(t *testing.T) {
 		t.Errorf("hit 1 = %+v", hits[1])
 	}
 }
+
+// When both sides know the repository, only the repository decides: a
+// different package that happens to share the name is not affected.
+func TestAffectsNameNeedsTheSameRepoWhenBothHaveOne(t *testing.T) {
+	a := Advisory{Package: "Panola", Repo: "https://github.com/evil/Panola", Versions: []string{"*"}}
+	if a.Affects("Panola", "https://github.com/shimpe/Panola", "1.0.0", "") {
+		t.Error("same name, other repository must not match")
+	}
+	if !a.Affects("Panola", "", "1.0.0", "") {
+		t.Error("an installed copy without a repository matches by name")
+	}
+	byName := Advisory{Package: "Panola", Versions: []string{"*"}}
+	if !byName.Affects("Panola", "https://github.com/shimpe/Panola", "1.0.0", "") {
+		t.Error("an advisory without a repository matches by name")
+	}
+}
+
+func TestLoadDirMissingFolderIsAnError(t *testing.T) {
+	_, err := LoadDir(filepath.Join(t.TempDir(), "advisories"))
+	if err == nil || !strings.Contains(err.Error(), "advisories") {
+		t.Fatalf("err = %v", err)
+	}
+}

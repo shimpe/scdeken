@@ -85,8 +85,12 @@ func publishedText(v any) (string, error) {
 }
 
 // LoadDir reads every *.toml advisory in dir, in file-name order. Ids must be
-// unique across the directory.
+// unique across the directory. A missing directory is an error, so a wrong
+// path never publishes an index without its advisories.
 func LoadDir(dir string) ([]Advisory, error) {
+	if _, err := os.Stat(dir); err != nil {
+		return nil, fmt.Errorf("read advisories folder: %w", err)
+	}
 	paths, err := filepath.Glob(filepath.Join(dir, "*.toml"))
 	if err != nil {
 		return nil, fmt.Errorf("list advisories in %s: %w", dir, err)
@@ -148,11 +152,14 @@ func (a Advisory) Affects(name, repo, version, commit string) bool {
 	return a.sameIdentity(name, repo) && (a.coversVersion(version) || a.coversCommit(commit))
 }
 
+// sameIdentity reports whether an installed copy (name, repo) is the
+// package the advisory is about. When both know the repository, only the
+// repository decides; the name decides when either one lacks it.
 func (a Advisory) sameIdentity(name, repo string) bool {
-	if a.Package != "" && strings.EqualFold(a.Package, name) {
-		return true
+	if a.Repo != "" && repo != "" {
+		return NormalizeRepo(a.Repo) == NormalizeRepo(repo)
 	}
-	return a.Repo != "" && repo != "" && NormalizeRepo(a.Repo) == NormalizeRepo(repo)
+	return a.Package != "" && strings.EqualFold(a.Package, name)
 }
 
 func (a Advisory) coversVersion(version string) bool {
