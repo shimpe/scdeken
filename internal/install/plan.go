@@ -133,7 +133,24 @@ func (s *Service) planOne(ctx context.Context, pkg *index.Package, rel *index.Re
 	if err := s.chooseRoute(ctx, &p, pkg, rel); err != nil {
 		return Plan{}, err
 	}
+	if err := s.applyDuplicates(&p, pkg); err != nil {
+		return Plan{}, err
+	}
 	return p, nil
+}
+
+// applyDuplicates records copies installed outside sc-deken and asks the
+// user what to do about them.
+func (s *Service) applyDuplicates(p *Plan, pkg *index.Package) error {
+	dups, err := s.findDuplicates(pkg)
+	if err != nil {
+		return fmt.Errorf("look for existing copies of %s: %w", pkg.Name, err)
+	}
+	if len(dups) > 0 {
+		p.Duplicates = dups
+		p.Confirm = append(p.Confirm, ConfirmDuplicates)
+	}
+	return nil
 }
 
 // afterInstall lists the steps needed once the files are in place.
