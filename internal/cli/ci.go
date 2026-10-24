@@ -9,11 +9,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/sc-deken/sc-deken/internal/archive"
-	"github.com/sc-deken/sc-deken/internal/build"
-	"github.com/sc-deken/sc-deken/internal/indexer"
-	"github.com/sc-deken/sc-deken/internal/platform"
-	"github.com/sc-deken/sc-deken/internal/recipe"
+	"github.com/shimpe/scdeken/internal/archive"
+	"github.com/shimpe/scdeken/internal/build"
+	"github.com/shimpe/scdeken/internal/indexer"
+	"github.com/shimpe/scdeken/internal/platform"
+	"github.com/shimpe/scdeken/internal/recipe"
 )
 
 // The commands the recipes repository's CI workflows call.

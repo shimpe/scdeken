@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sc-deken/sc-deken/internal/run"
+	"github.com/shimpe/scdeken/internal/run"
 )
 
 // Deps are the things tests replace: the process runner, the clock, the

@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/sc-deken/sc-deken/internal/advisory"
-	"github.com/sc-deken/sc-deken/internal/index"
-	"github.com/sc-deken/sc-deken/internal/version"
+	"github.com/shimpe/scdeken/internal/advisory"
+	"github.com/shimpe/scdeken/internal/index"
+	"github.com/shimpe/scdeken/internal/version"
 )
 
 // AdvisoryHit says that an advisory affects an installed package.

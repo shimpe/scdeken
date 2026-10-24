@@ -3,7 +3,7 @@ package doctor
 import (
 	"fmt"
 
-	"github.com/sc-deken/sc-deken/internal/recipe"
+	"github.com/shimpe/scdeken/internal/recipe"
 )
 
 // platform is the kind of system a hint is written for.

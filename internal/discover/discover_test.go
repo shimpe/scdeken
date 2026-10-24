@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sc-deken/sc-deken/internal/recipe"
-	"github.com/sc-deken/sc-deken/internal/run"
+	"github.com/shimpe/scdeken/internal/recipe"
+	"github.com/shimpe/scdeken/internal/run"
 )
 
 func TestRemoteRefsPeeled(t *testing.T) {

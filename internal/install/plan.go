@@ -7,11 +7,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/sc-deken/sc-deken/internal/advisory"
-	"github.com/sc-deken/sc-deken/internal/doctor"
-	"github.com/sc-deken/sc-deken/internal/index"
-	"github.com/sc-deken/sc-deken/internal/platform"
-	"github.com/sc-deken/sc-deken/internal/recipe"
+	"github.com/shimpe/scdeken/internal/advisory"
+	"github.com/shimpe/scdeken/internal/doctor"
+	"github.com/shimpe/scdeken/internal/index"
+	"github.com/shimpe/scdeken/internal/platform"
+	"github.com/shimpe/scdeken/internal/recipe"
 )
 
 // Route is how a package gets installed.

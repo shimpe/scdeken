@@ -11,12 +11,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sc-deken/sc-deken/internal/advisory"
-	"github.com/sc-deken/sc-deken/internal/discover"
-	"github.com/sc-deken/sc-deken/internal/github"
-	"github.com/sc-deken/sc-deken/internal/index"
-	"github.com/sc-deken/sc-deken/internal/recipe"
-	"github.com/sc-deken/sc-deken/internal/run"
+	"github.com/shimpe/scdeken/internal/advisory"
+	"github.com/shimpe/scdeken/internal/discover"
+	"github.com/shimpe/scdeken/internal/github"
+	"github.com/shimpe/scdeken/internal/index"
+	"github.com/shimpe/scdeken/internal/recipe"
+	"github.com/shimpe/scdeken/internal/run"
 )
 
 const (

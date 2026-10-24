@@ -10,10 +10,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/sc-deken/sc-deken/internal/advisory"
-	"github.com/sc-deken/sc-deken/internal/indexer"
-	"github.com/sc-deken/sc-deken/internal/recipe"
-	"github.com/sc-deken/sc-deken/internal/sign"
+	"github.com/shimpe/scdeken/internal/advisory"
+	"github.com/shimpe/scdeken/internal/indexer"
+	"github.com/shimpe/scdeken/internal/recipe"
+	"github.com/shimpe/scdeken/internal/sign"
 )
 
 // Environment variables that hold the signing key in CI.

@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/sc-deken/sc-deken/internal/recipe"
+	"github.com/shimpe/scdeken/internal/recipe"
 )
 
 // SearchOptions narrows a search.

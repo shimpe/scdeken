@@ -10,9 +10,9 @@ import (
 	"io"
 	"time"
 
-	"github.com/sc-deken/sc-deken/internal/run"
-	"github.com/sc-deken/sc-deken/internal/scenv"
-	"github.com/sc-deken/sc-deken/internal/sign"
+	"github.com/shimpe/scdeken/internal/run"
+	"github.com/shimpe/scdeken/internal/scenv"
+	"github.com/shimpe/scdeken/internal/sign"
 )
 
 // Main runs scdeken with the given arguments (without the program name) and

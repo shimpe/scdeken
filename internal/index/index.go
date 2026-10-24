@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sc-deken/sc-deken/internal/advisory"
-	"github.com/sc-deken/sc-deken/internal/platform"
-	"github.com/sc-deken/sc-deken/internal/recipe"
+	"github.com/shimpe/scdeken/internal/advisory"
+	"github.com/shimpe/scdeken/internal/platform"
+	"github.com/shimpe/scdeken/internal/recipe"
 )
 
 // SchemaVersion is the index format this sc-deken understands.

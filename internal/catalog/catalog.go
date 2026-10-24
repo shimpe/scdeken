@@ -21,9 +21,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sc-deken/sc-deken/internal/fetch"
-	"github.com/sc-deken/sc-deken/internal/index"
-	"github.com/sc-deken/sc-deken/internal/sign"
+	"github.com/shimpe/scdeken/internal/fetch"
+	"github.com/shimpe/scdeken/internal/index"
+	"github.com/shimpe/scdeken/internal/sign"
 )
 
 const (

@@ -4,7 +4,7 @@
 	version: "0.1.0",
 	schelp: "Deken",
 	dependencies: [],
-	url: "https://github.com/sc-deken/sc-deken",
+	url: "https://github.com/shimpe/scdeken",
 	license: "MIT",
 	copyright: "Stefaan Himpe"
 )

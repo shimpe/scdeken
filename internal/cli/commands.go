@@ -6,14 +6,14 @@ import (
 	"sort"
 	"time"
 
-	"github.com/sc-deken/sc-deken/internal/doctor"
-	"github.com/sc-deken/sc-deken/internal/index"
-	"github.com/sc-deken/sc-deken/internal/install"
-	"github.com/sc-deken/sc-deken/internal/platform"
-	"github.com/sc-deken/sc-deken/internal/recipe"
+	"github.com/shimpe/scdeken/internal/doctor"
+	"github.com/shimpe/scdeken/internal/index"
+	"github.com/shimpe/scdeken/internal/install"
+	"github.com/shimpe/scdeken/internal/platform"
+	"github.com/shimpe/scdeken/internal/recipe"
 )
 
-// Set with -ldflags "-X github.com/sc-deken/sc-deken/internal/cli.buildVersion=..."
+// Set with -ldflags "-X github.com/shimpe/scdeken/internal/cli.buildVersion=..."
 var (
 	buildVersion = "dev"
 	buildCommit  = ""

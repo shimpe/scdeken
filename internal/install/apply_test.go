@@ -16,12 +16,12 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/sc-deken/sc-deken/internal/archive"
-	"github.com/sc-deken/sc-deken/internal/fetch"
-	"github.com/sc-deken/sc-deken/internal/index"
-	"github.com/sc-deken/sc-deken/internal/recipe"
-	"github.com/sc-deken/sc-deken/internal/run"
-	"github.com/sc-deken/sc-deken/internal/state"
+	"github.com/shimpe/scdeken/internal/archive"
+	"github.com/shimpe/scdeken/internal/fetch"
+	"github.com/shimpe/scdeken/internal/index"
+	"github.com/shimpe/scdeken/internal/recipe"
+	"github.com/shimpe/scdeken/internal/run"
+	"github.com/shimpe/scdeken/internal/state"
 )
 
 func writeTestFile(t *testing.T, path, content string) {

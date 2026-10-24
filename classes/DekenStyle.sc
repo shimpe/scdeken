@@ -87,12 +87,12 @@ DekenStyle {
 
 	// Where an advisory is written down.
 	*advisoryURL { |id|
-		^"https://github.com/sc-deken/sc-deken-recipes/blob/main/advisories/%.toml".format(id)
+		^"https://github.com/shimpe/scdeken-recipes/blob/main/advisories/%.toml".format(id)
 	}
 
 	// The form for asking for a package to be reviewed.
 	*suggestURL { |repo|
-		^"https://github.com/sc-deken/sc-deken-recipes/issues/new?template=add-package.yml&repo_url=%".format(this.percentEncode(repo))
+		^"https://github.com/shimpe/scdeken-recipes/issues/new?template=add-package.yml&repo_url=%".format(this.percentEncode(repo))
 	}
 
 	// Escapes everything but letters, digits and - . _ ~ for use in a web address.

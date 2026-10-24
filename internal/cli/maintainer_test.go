@@ -7,7 +7,7 @@ import (
 
 	"bytes"
 	"encoding/json"
-	"github.com/sc-deken/sc-deken/internal/run"
+	"github.com/shimpe/scdeken/internal/run"
 	"os"
 	"path/filepath"
 	"strings"

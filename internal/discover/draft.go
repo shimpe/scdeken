@@ -7,9 +7,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/sc-deken/sc-deken/internal/github"
-	"github.com/sc-deken/sc-deken/internal/recipe"
-	"github.com/sc-deken/sc-deken/internal/version"
+	"github.com/shimpe/scdeken/internal/github"
+	"github.com/shimpe/scdeken/internal/recipe"
+	"github.com/shimpe/scdeken/internal/version"
 )
 
 // untaggedVersion names the first approved version of a repository without tags.

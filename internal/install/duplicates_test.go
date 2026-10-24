@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/sc-deken/sc-deken/internal/scenv"
+	"github.com/shimpe/scdeken/internal/scenv"
 )
 
 // writeFile creates path (and any parent folders) with content.

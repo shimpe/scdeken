@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/sc-deken/sc-deken/internal/run"
+	"github.com/shimpe/scdeken/internal/run"
 )
 
 // compileUniversal builds arm64 and x86_64 separately, then merges them into

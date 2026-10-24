@@ -3,14 +3,14 @@ package install
 import (
 	"testing"
 
-	"github.com/sc-deken/sc-deken/internal/advisory"
-	"github.com/sc-deken/sc-deken/internal/doctor"
-	"github.com/sc-deken/sc-deken/internal/index"
-	"github.com/sc-deken/sc-deken/internal/platform"
-	"github.com/sc-deken/sc-deken/internal/recipe"
-	"github.com/sc-deken/sc-deken/internal/run"
-	"github.com/sc-deken/sc-deken/internal/scenv"
-	"github.com/sc-deken/sc-deken/internal/state"
+	"github.com/shimpe/scdeken/internal/advisory"
+	"github.com/shimpe/scdeken/internal/doctor"
+	"github.com/shimpe/scdeken/internal/index"
+	"github.com/shimpe/scdeken/internal/platform"
+	"github.com/shimpe/scdeken/internal/recipe"
+	"github.com/shimpe/scdeken/internal/run"
+	"github.com/shimpe/scdeken/internal/scenv"
+	"github.com/shimpe/scdeken/internal/state"
 )
 
 const (

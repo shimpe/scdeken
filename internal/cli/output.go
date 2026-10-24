@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/sc-deken/sc-deken/internal/install"
+	"github.com/shimpe/scdeken/internal/install"
 )
 
 // Exit codes of scdeken.

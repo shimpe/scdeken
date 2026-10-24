@@ -12,7 +12,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"github.com/sc-deken/sc-deken/internal/version"
+	"github.com/shimpe/scdeken/internal/version"
 )
 
 // Kind says what a package contains.

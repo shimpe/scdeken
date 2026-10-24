@@ -8,9 +8,9 @@ import (
 	"regexp"
 	"sort"
 
-	"github.com/sc-deken/sc-deken/internal/recipe"
-	"github.com/sc-deken/sc-deken/internal/run"
-	"github.com/sc-deken/sc-deken/internal/version"
+	"github.com/shimpe/scdeken/internal/recipe"
+	"github.com/shimpe/scdeken/internal/run"
+	"github.com/shimpe/scdeken/internal/version"
 )
 
 // MinCMake is the oldest CMake version that can build plugins.

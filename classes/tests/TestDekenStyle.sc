@@ -78,8 +78,8 @@ TestDekenStyle : UnitTest {
 	test_links {
 		this.assertEquals(DekenStyle.percentEncode("https://github.com/a/b"), "https%3A%2F%2Fgithub.com%2Fa%2Fb");
 		this.assertEquals(DekenStyle.suggestURL("https://github.com/a/b"),
-			"https://github.com/sc-deken/sc-deken-recipes/issues/new?template=add-package.yml&repo_url=https%3A%2F%2Fgithub.com%2Fa%2Fb");
+			"https://github.com/shimpe/scdeken-recipes/issues/new?template=add-package.yml&repo_url=https%3A%2F%2Fgithub.com%2Fa%2Fb");
 		this.assertEquals(DekenStyle.advisoryURL("SCD-2026-001"),
-			"https://github.com/sc-deken/sc-deken-recipes/blob/main/advisories/SCD-2026-001.toml");
+			"https://github.com/shimpe/scdeken-recipes/blob/main/advisories/SCD-2026-001.toml");
 	}
 }

@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"sort"
 
-	"github.com/sc-deken/sc-deken/internal/run"
+	"github.com/shimpe/scdeken/internal/run"
 )
 
 // Triplet returns the vcpkg triplet for an OS and architecture, or "" when

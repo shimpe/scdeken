@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sc-deken/sc-deken/internal/config"
-	"github.com/sc-deken/sc-deken/internal/run"
-	"github.com/sc-deken/sc-deken/internal/version"
+	"github.com/shimpe/scdeken/internal/config"
+	"github.com/shimpe/scdeken/internal/run"
+	"github.com/shimpe/scdeken/internal/version"
 )
 
 func mustVersion(t *testing.T, s string) version.Version {

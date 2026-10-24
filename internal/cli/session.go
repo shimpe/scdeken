@@ -7,15 +7,15 @@ import (
 	"io"
 	"time"
 
-	"github.com/sc-deken/sc-deken/internal/catalog"
-	"github.com/sc-deken/sc-deken/internal/config"
-	"github.com/sc-deken/sc-deken/internal/doctor"
-	"github.com/sc-deken/sc-deken/internal/fetch"
-	"github.com/sc-deken/sc-deken/internal/index"
-	"github.com/sc-deken/sc-deken/internal/install"
-	"github.com/sc-deken/sc-deken/internal/osc"
-	"github.com/sc-deken/sc-deken/internal/scenv"
-	"github.com/sc-deken/sc-deken/internal/state"
+	"github.com/shimpe/scdeken/internal/catalog"
+	"github.com/shimpe/scdeken/internal/config"
+	"github.com/shimpe/scdeken/internal/doctor"
+	"github.com/shimpe/scdeken/internal/fetch"
+	"github.com/shimpe/scdeken/internal/index"
+	"github.com/shimpe/scdeken/internal/install"
+	"github.com/shimpe/scdeken/internal/osc"
+	"github.com/shimpe/scdeken/internal/scenv"
+	"github.com/shimpe/scdeken/internal/state"
 )
 
 // session is everything one command needs: where log lines and progress go,

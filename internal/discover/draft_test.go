@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sc-deken/sc-deken/internal/github"
-	"github.com/sc-deken/sc-deken/internal/recipe"
+	"github.com/shimpe/scdeken/internal/github"
+	"github.com/shimpe/scdeken/internal/recipe"
 )
 
 const (

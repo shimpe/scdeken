@@ -10,9 +10,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/sc-deken/sc-deken/internal/recipe"
-	"github.com/sc-deken/sc-deken/internal/run"
-	"github.com/sc-deken/sc-deken/internal/scclass"
+	"github.com/shimpe/scdeken/internal/recipe"
+	"github.com/shimpe/scdeken/internal/run"
+	"github.com/shimpe/scdeken/internal/scclass"
 )
 
 // Scan is what a repository's files tell us about the package inside.

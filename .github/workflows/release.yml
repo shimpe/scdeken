@@ -47,7 +47,7 @@ jobs:
           PLATFORM: ${{ matrix.platform }}
           EXT: ${{ matrix.ext }}
         run: |
-          pkg=github.com/sc-deken/sc-deken/internal/cli
+          pkg=github.com/shimpe/scdeken/internal/cli
           mkdir -p dist
           go build -trimpath \
             -ldflags "-s -w -X ${pkg}.buildVersion=${TAG#v} -X ${pkg}.buildCommit=${SHA}" \

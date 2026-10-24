@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/sc-deken/sc-deken/internal/run"
+	"github.com/shimpe/scdeken/internal/run"
 )
 
 // RemoteRefs asks the repository at url for its HEAD commit and its tags

@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/sc-deken/sc-deken/internal/discover"
-	"github.com/sc-deken/sc-deken/internal/recipe"
-	"github.com/sc-deken/sc-deken/internal/version"
+	"github.com/shimpe/scdeken/internal/discover"
+	"github.com/shimpe/scdeken/internal/recipe"
+	"github.com/shimpe/scdeken/internal/version"
 )
 
 // Proposal is a new upstream version of a reviewed package that nobody has

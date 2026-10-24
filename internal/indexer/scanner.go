@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/sc-deken/sc-deken/internal/discover"
-	"github.com/sc-deken/sc-deken/internal/run"
+	"github.com/shimpe/scdeken/internal/discover"
+	"github.com/shimpe/scdeken/internal/run"
 )
 
 // DefaultRepoTimeout is how long one repository may take to list or scan.

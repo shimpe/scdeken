@@ -3,7 +3,7 @@ package platform
 import (
 	"testing"
 
-	"github.com/sc-deken/sc-deken/internal/version"
+	"github.com/shimpe/scdeken/internal/version"
 )
 
 func TestKeyStringRoundTrip(t *testing.T) {

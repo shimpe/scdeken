@@ -10,13 +10,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sc-deken/sc-deken/internal/archive"
-	"github.com/sc-deken/sc-deken/internal/build"
-	"github.com/sc-deken/sc-deken/internal/headers"
-	"github.com/sc-deken/sc-deken/internal/platform"
-	"github.com/sc-deken/sc-deken/internal/recipe"
-	"github.com/sc-deken/sc-deken/internal/run"
-	"github.com/sc-deken/sc-deken/internal/state"
+	"github.com/shimpe/scdeken/internal/archive"
+	"github.com/shimpe/scdeken/internal/build"
+	"github.com/shimpe/scdeken/internal/headers"
+	"github.com/shimpe/scdeken/internal/platform"
+	"github.com/shimpe/scdeken/internal/recipe"
+	"github.com/shimpe/scdeken/internal/run"
+	"github.com/shimpe/scdeken/internal/state"
 )
 
 // Choices are the user's answers to the confirmations a plan asked for.

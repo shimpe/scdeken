@@ -5,7 +5,7 @@ package main
 import (
 	"os"
 
-	"github.com/sc-deken/sc-deken/internal/cli"
+	"github.com/shimpe/scdeken/internal/cli"
 )
 
 func main() {

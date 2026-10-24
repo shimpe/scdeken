@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/sc-deken/sc-deken/internal/install"
-	"github.com/sc-deken/sc-deken/internal/scenv"
+	"github.com/shimpe/scdeken/internal/install"
+	"github.com/shimpe/scdeken/internal/scenv"
 )
 
 // Request is one command for scdeken, either built from command-line flags or

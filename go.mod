@@ -1,4 +1,4 @@
-module github.com/sc-deken/sc-deken
+module github.com/shimpe/scdeken
 
 go 1.23
 

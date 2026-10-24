@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sc-deken/sc-deken/internal/index"
-	"github.com/sc-deken/sc-deken/internal/run"
-	"github.com/sc-deken/sc-deken/internal/sign"
+	"github.com/shimpe/scdeken/internal/index"
+	"github.com/shimpe/scdeken/internal/run"
+	"github.com/shimpe/scdeken/internal/sign"
 )
 
 // runMain runs scdeken with deps and returns its exit code and output.

@@ -4,11 +4,11 @@ import (
 	"time"
 
 	"context"
-	"github.com/sc-deken/sc-deken/internal/run"
+	"github.com/shimpe/scdeken/internal/run"
 	"strings"
 	"testing"
 
-	"github.com/sc-deken/sc-deken/internal/recipe"
+	"github.com/shimpe/scdeken/internal/recipe"
 )
 
 func tagRecipe(approved map[string]string) recipe.Recipe {

@@ -6,11 +6,11 @@ const (
 	// HelperName is the name of the Go helper executable.
 	HelperName = "scdeken"
 	// ToolRepo is the GitHub repository of the tool itself.
-	ToolRepo = "sc-deken/sc-deken"
+	ToolRepo = "shimpe/scdeken"
 	// RecipesRepo is the GitHub repository holding recipes and advisories.
-	RecipesRepo = "sc-deken/sc-deken-recipes"
+	RecipesRepo = "shimpe/scdeken-recipes"
 	// DefaultIndexURL is where the package index is downloaded from.
-	DefaultIndexURL = "https://sc-deken.github.io/sc-deken-recipes/index.json"
+	DefaultIndexURL = "https://shimpe.github.io/scdeken-recipes/index.json"
 	// SCRepoURL is the SuperCollider source repository.
 	SCRepoURL = "https://github.com/supercollider/supercollider"
 	// QuarksDirectoryURL is the official list of quarks the indexer reads.
