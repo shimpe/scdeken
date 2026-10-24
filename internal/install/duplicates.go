@@ -19,7 +19,14 @@ import (
 // directly in a root), sorted by path. Missing roots and unreadable files
 // are ignored, and links are not followed.
 func FindDuplicates(roots []string, skip []string, pluginFiles, classes []string) ([]Duplicate, error) {
+	return scanDuplicates(roots, skip, "", pluginFiles, classes)
+}
+
+// scanDuplicates is FindDuplicates for a known managed folder: a match inside
+// it is reported as the package folder below it, never as the whole tree.
+func scanDuplicates(roots, skip []string, managed string, pluginFiles, classes []string) ([]Duplicate, error) {
 	f := finder{
+		managed: managed,
 		skip:    skip,
 		plugins: map[string]string{},
 		classes: map[string]bool{},
@@ -39,6 +46,7 @@ func FindDuplicates(roots []string, skip []string, pluginFiles, classes []string
 
 // finder holds what to look for and what has been found so far.
 type finder struct {
+	managed string // sc-deken's own folder; "" when unknown
 	skip    []string
 	plugins map[string]string // lowercase file name -> name as listed
 	classes map[string]bool
@@ -111,10 +119,22 @@ func (f *finder) match(path string) string {
 
 // record keeps the first match found under each top folder of root.
 func (f *finder) record(root, path, matched string) {
+	if inside(f.managed, path) {
+		root = f.managed
+	}
 	top := topFolder(root, path)
 	if _, seen := f.found[top]; !seen {
 		f.found[top] = Duplicate{Path: top, Matched: matched}
 	}
+}
+
+// inside reports whether path lies below dir.
+func inside(dir, path string) bool {
+	if dir == "" {
+		return false
+	}
+	rel, err := filepath.Rel(dir, path)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
 // topFolder is the first folder below root on the way to path, or path
@@ -146,7 +166,7 @@ func (f *finder) result() []Duplicate {
 func (s *Service) findDuplicates(pkg *index.Package) ([]Duplicate, error) {
 	roots := append([]string{s.Ctx.ExtensionDir, s.Ctx.SystemExtensionDir}, s.Ctx.IncludePaths...)
 	classes := append(append([]string{}, pkg.Classes...), pkg.UGens...)
-	return FindDuplicates(roots, s.skipFolders(pkg), pkg.PluginFiles, classes)
+	return scanDuplicates(roots, s.skipFolders(pkg), s.Paths.Managed, pkg.PluginFiles, classes)
 }
 
 // skipFolders are the folders holding pkg's own, sc-deken-managed files.
