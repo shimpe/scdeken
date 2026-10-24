@@ -171,4 +171,70 @@ TestDekenAdvisory : UnitTest {
 		this.assert(r.ok.not, "the check fails");
 		this.assert(posted.not, "and says nothing");
 	}
+
+	test_recommendedAndDetailsLink {
+		var h = this.hit("broken", nil);
+		this.assertEquals(DekenAdvisoryDialog.removeIsRecommended(this.hit("malware", nil)), true);
+		this.assertEquals(DekenAdvisoryDialog.removeIsRecommended(this.hit("vulnerable", nil)), true);
+		this.assertEquals(DekenAdvisoryDialog.removeIsRecommended(h), false, "not for broken");
+		this.assertEquals(DekenAdvisoryDialog.detailsURL(h), DekenStyle.advisoryURL("SCD-2026-0001"), "falls back when there is no details");
+		h["advisory"]["details"] = "https://example.org/the-details";
+		this.assertEquals(DekenAdvisoryDialog.detailsURL(h), "https://example.org/the-details");
+	}
+
+	// ---- failure and double click (a quark whose folder is not there to move)
+
+	missingFolderHit {
+		var h = this.hit("malware", nil);
+		h["item"]["path"] = root +/+ "NotThere";
+		^h
+	}
+
+	test_failedQuarantineAfterUninstallSaysSoAndAsksForRecompile {
+		var h = this.missingFolderHit;
+		var r;
+		DekenQuarks.override_((uninstall: { |name| nil }));
+		r = this.await("remove", { |a| Deken.removeWithdrawn(h, a) });
+		this.assert(r.ok.not, "reports the failure");
+		this.assert(r[\error].beginsWith("Evil was taken out of SuperCollider's class library (recompile to stop it loading), but its folder could not be moved and is still at " ++ h["item"]["path"] ++ ": "), "says what happened: " ++ r[\error]);
+		this.assertEquals(r[\after_install], ["recompile"]);
+	}
+
+	test_secondClickDuringAJobDoesNothing {
+		var h = this.missingFolderHit;
+		var uninstalls = 0, outcome, dialog, busyAtOnce;
+		DekenQuarks.override_((uninstall: { |name| uninstalls = uninstalls + 1 }));
+		// Windows only work on the GUI clock.
+		{
+			dialog = DekenAdvisoryDialog.show(h, { |o| outcome = o });
+			dialog[\act].value(\remove);
+			busyAtOnce = dialog[\isBusy].value;
+			dialog[\act].value(\remove);
+			dialog[\act].value(\later);
+		}.defer;
+		this.wait({ outcome.notNil }, "the job finished", 40);
+		this.assert(busyAtOnce, "busy at once");
+		this.assertEquals(uninstalls, 1, "the second click started nothing");
+		this.assertEquals(outcome[\kind], \removed, "and Remind me later did not end the dialog early");
+		this.assertEquals(outcome[\steps], ["recompile"]);
+		{ Window.allWindows.do { |win| win.close } }.defer;
+	}
+
+	test_updateAsksBeforeInstalling {
+		var hit, plan, answer, finished = false, cancelled = false;
+		this.installFakeQuark;
+		hit = this.check.data[0];
+		DekenQuarks.override_((
+			install: { |url, commit| finished = true },
+			checkout: { |name, commit| finished = true }));
+		DekenAdvisoryDialog.update(hit, { |p, a| plan = p; answer = a }, { |r| if(r.isNil) { cancelled = true } { finished = true } });
+		this.wait({ plan.notNil }, "the confirmation was asked for", 40);
+		this.assertEquals(plan["version"], "1.1.0", "the fixed version, not just the newest");
+		this.assert(plan["confirm"].indexOfEqual("unreviewed").notNil, "unreviewed needs an OK");
+		this.assert(finished.not and: { cancelled.not }, "nothing is reported or installed before the answer");
+		answer.value(nil);
+		this.assert(cancelled, "cancelling reports a cancel");
+		this.assert(finished.not, "and installs nothing");
+		this.assert(File.exists(quarkPath), "the quark is untouched");
+	}
 }

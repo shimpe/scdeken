@@ -97,6 +97,12 @@ Deken {
 		if(problem.notNil) { ^action.value(DekenHelper.prResponse(false, nil, problem, [], 1)) };
 		this.prRequest((command: "quarantine", path: item["path"], advisory_id: hit["advisory"]["id"]), { |r|
 			if(r.ok) { r[\after_install] = this.prRemovalSteps(item) };
+			if(r.ok.not and: { item["source"] == "quark" }) {
+				// The quark is already out of the class library: say so, and ask for a recompile.
+				r[\error] = "% was taken out of SuperCollider's class library (recompile to stop it loading), but its folder could not be moved and is still at %: %".format(
+					item["name"], item["path"], r[\error]);
+				r[\after_install] = ["recompile"]
+			};
 			action.value(r)
 		})
 	}

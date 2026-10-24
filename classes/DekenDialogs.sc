@@ -171,12 +171,40 @@ DekenDialogs {
 	// ---- plain question
 
 	// action is called only when the user agrees. Cancel is the default.
-	*ask { |title, text, okLabel, action|
+	// onCancel (optional) is called when the user says no or closes the window.
+	*ask { |title, text, okLabel, action, onCancel|
 		var w = this.prWindow(title, 460, 170);
+		var agreed = false;
 		var cancel = Button().states_([["Cancel"]]).action_({ w.close });
 		w.layout = VLayout(this.prLabel(text), nil, HLayout(nil,
-			Button().states_([[okLabel]]).action_({ w.close; action.value }), cancel));
+			Button().states_([[okLabel]]).action_({ agreed = true; w.close; action.value }), cancel));
+		w.onClose = { if(agreed.not) { onCancel.value } };
 		this.prShow(w, cancel);
+		^w
+	}
+
+	// ---- after a removal
+
+	// moves: one line per package ("X moved to <folder>"). steps: what the
+	// helper's removal asks for next (recompile, reboot-server).
+	*afterRemoval { |moves, steps, recompile|
+		var needsRecompile = steps.indexOfEqual("recompile").notNil;
+		var w = this.prWindow("Removed", 560, 190 + (moves.size * 22));
+		var later = Button().states_([[if(needsRecompile) { "Later" } { "OK" }]]).action_({ w.close });
+		var views = [this.prLabel("Done. " ++ DekenStyle.afterInstallText(steps) ++ ".", true)]
+			++ moves.collect { |m| this.prLabel(m) };
+		if(steps.indexOfEqual("reboot-server").notNil) {
+			views = views ++ [this.prLabel("Reboot the sound server (s.reboot) so the removed plugin is no longer loaded.")]
+		};
+		if(needsRecompile) {
+			views = views ++ [this.prLabel("Recompiling restarts the class library and closes this window.")]
+		};
+		w.layout = VLayout(*(views ++ [nil, HLayout(nil,
+			if(needsRecompile) {
+				Button().states_([["Recompile class library now"]]).action_({ w.close; (recompile ? { thisProcess.recompile }).value })
+			} { nil },
+			later)]));
+		this.prShow(w, later);
 		^w
 	}
 
