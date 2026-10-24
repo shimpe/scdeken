@@ -21,7 +21,7 @@ func TestPathsUnderAppSupport(t *testing.T) {
 		t.Errorf("Root = %q, want %q", p.Root, want)
 	}
 	for name, got := range map[string]string{
-		"Cache": p.Cache, "Headers": p.Headers, "Work": p.Work, "Quarantine": p.Quarantine,
+		"Cache": p.Cache, "Catalog": p.Catalog, "Headers": p.Headers, "Work": p.Work, "Quarantine": p.Quarantine,
 		"Backup": p.Backup, "TrustedKeys": p.TrustedKeys,
 	} {
 		if filepath.Dir(got) != p.Root {

@@ -80,7 +80,7 @@ func defaultDirs(goos string) (appSupport, system string) {
 
 // Paths holds every folder and file sc-deken owns.
 type Paths struct {
-	Root, Cache, Headers, Work, Quarantine, Backup, State, TrustedKeys, Managed string
+	Root, Cache, Catalog, Headers, Work, Quarantine, Backup, State, TrustedKeys, Managed string
 }
 
 // Paths derives sc-deken's folders from the session's directories.
@@ -89,6 +89,7 @@ func (c Context) Paths() Paths {
 	return Paths{
 		Root:        root,
 		Cache:       filepath.Join(root, "cache"),
+		Catalog:     filepath.Join(root, "catalog"),
 		Headers:     filepath.Join(root, "sc-headers"),
 		Work:        filepath.Join(root, "work"),
 		Quarantine:  filepath.Join(root, "quarantine"),
