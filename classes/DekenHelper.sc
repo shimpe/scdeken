@@ -10,6 +10,8 @@
 // JSON as parsed by DekenJSON (Dictionaries with String keys).
 DekenHelper {
 	classvar <>lockPath;
+	classvar waiting;                // callers waiting for the download in flight
+	classvar <>downloadCount = 0;    // how many downloads were started (for tests)
 
 	// ---- locating and downloading the helper
 
@@ -26,7 +28,24 @@ DekenHelper {
 			^this.prFail("could not read the helper description: " ++ err.errorString, onFail)
 		};
 		if(File.exists(path)) { ^onReady.value(path) };
-		this.prDownload(lock, path, onReady, onFail)
+		// One download at a time: later callers wait for the one in flight.
+		waiting = waiting.add((ready: onReady, fail: onFail));
+		if(waiting.size == 1) {
+			downloadCount = downloadCount + 1;
+			try {
+				this.prDownload(lock, path,
+					{ |p| this.prFinishWaiting(\ready, p) },
+					{ |msg| this.prFinishWaiting(\fail, msg) })
+			} { |err|
+				this.prFail("downloading the helper failed: " ++ err.errorString, { |msg| this.prFinishWaiting(\fail, msg) })
+			}
+		}
+	}
+
+	*prFinishWaiting { |which, value|
+		var callers = waiting;
+		waiting = nil;
+		callers.do { |c| try { c[which].value(value) } { |err| err.reportError } }
 	}
 
 	// helper-lock.json next to classes/, unless lockPath says otherwise.
@@ -60,13 +79,13 @@ DekenHelper {
 	}
 
 	*prDownload { |lock, path, onReady, onFail|
-		var part = path ++ ".part";
+		// Every download has its own file, so nothing else can touch what is hashed.
+		var part = path ++ "." ++ UniqueID.next ++ ".part";
 		var expected = lock["sha256"] !? { |t| t[this.platformKey] };
 		if(expected.isNil) {
 			^this.prFail("this release lists no checksum for " ++ this.platformKey ++ ", so no helper can be downloaded.", onFail)
 		};
 		this.prMkdirs(this.binDir);
-		this.prDiscard(part);
 		this.prShell(this.curlCommand(part, this.downloadURL(lock))) { |exit|
 			if(exit != 0) {
 				this.prDiscard(part);
@@ -114,7 +133,8 @@ DekenHelper {
 		{ DekenShell.command("sha256sum", [file]) };
 	}
 
-	// chmod +x (Unix) and move into place.
+	// part is the verified file. chmod +x (Unix; if that fails the file is
+	// discarded) and move into place.
 	*prInstall { |part, path, onReady, onFail|
 		var move = {
 			var cmd = if(DekenShell.isWindows) { "move /Y " ++ DekenShell.quote(part) ++ " " ++ DekenShell.quote(path) } { DekenShell.command("mv", ["-f", part, path]) };
@@ -126,7 +146,12 @@ DekenHelper {
 			}
 		};
 		if(DekenShell.isWindows) { move.value } {
-			this.prShell(DekenShell.command("chmod", ["+x", part])) { |exit| move.value }
+			this.prShell(DekenShell.command("chmod", ["+x", part])) { |exit|
+				if(exit == 0) { move.value } {
+					this.prDiscard(part);
+					this.prFail("could not make the downloaded helper executable.", onFail)
+				}
+			}
 		}
 	}
 
@@ -134,33 +159,43 @@ DekenHelper {
 
 	// Runs one helper command. request is an Event such as
 	// (command: "search", query: "fm"); the context and Deken.indexURL are
-	// added here. onDone gets the response Event; onLog gets each log line;
-	// onProgress gets (fraction, label).
+	// added here. onDone gets the response Event exactly once, whatever goes
+	// wrong; onLog gets each log line; onProgress gets (fraction, label).
 	*run { |request, onDone, onLog, onProgress|
 		var job = "j" ++ Date.getDate.rawSeconds.asInteger ++ UniqueID.next;
-		this.ensure({ |helper| this.prLaunch(helper, job, request, onDone, onLog, onProgress) }, { |msg|
-			onDone.value((ok: false, error: msg, exit_code: -1))
-		})
+		var finished = false;
+		var finish = { |response|
+			if(finished.not) { finished = true; onDone.value(response) }
+		};
+		var failed = { |msg| finish.value(this.prResponse(false, nil, msg, [], -1)) };
+		try {
+			this.ensure({ |helper| this.prLaunch(helper, job, request, finish, onLog, onProgress) }, failed)
+		} { |err| failed.value(err.errorString) }
+	}
+
+	// The one way to make a response: confirm is always an Array.
+	*prResponse { |ok, data, error, confirm, exitCode|
+		^(ok: ok, data: data, error: error, confirm: confirm ? [], exit_code: exitCode)
 	}
 
 	*jobsDir { ^Platform.userAppSupportDir +/+ "sc-deken" +/+ "jobs" }
 
-	*prLaunch { |helper, job, request, onDone, onLog, onProgress|
+	*prLaunch { |helper, job, request, finish, onLog, onProgress|
 		var req = this.jobsDir +/+ (job ++ ".request.json");
 		var res = this.jobsDir +/+ (job ++ ".result.json");
-		this.prMkdirs(this.jobsDir);
-		this.prWriteRequest(req, job, request);
-		this.prListen(job, onLog, onProgress);
-		this.prShell(DekenShell.command(helper, ["run", req, res])) { |exit|
-			var response = this.prReadResponse(res, exit);
-			// OSC is UDP: give the last log lines a moment to arrive.
-			AppClock.sched(0.2, {
-				this.prUnlisten(job);
-				this.prDiscard(req);
-				this.prDiscard(res);
-				onDone.value(response);
-				nil
-			})
+		var cleanUp = { this.prUnlisten(job); this.prDiscard(req); this.prDiscard(res) };
+		try {
+			this.prMkdirs(this.jobsDir);
+			this.prWriteRequest(req, job, request);
+			this.prListen(job, onLog, onProgress);
+			this.prShell(DekenShell.command(helper, ["run", req, res])) { |exit|
+				var response = this.prReadResponse(res, exit);
+				// OSC is UDP: give the last log lines a moment to arrive.
+				AppClock.sched(0.2, { cleanUp.value; finish.value(response); nil })
+			}
+		} { |err|
+			cleanUp.value;
+			finish.value(this.prResponse(false, nil, "could not start the helper: " ++ err.errorString, [], -1))
 		}
 	}
 
@@ -192,13 +227,13 @@ DekenHelper {
 	*prReadResponse { |path, exit|
 		var doc;
 		if(File.exists(path).not) {
-			^(ok: false, error: "scdeken did not answer (exit code %).".format(exit), exit_code: exit)
+			^this.prResponse(false, nil, "scdeken did not answer (exit code %).".format(exit), [], exit)
 		};
 		doc = try { DekenJSON.parse(File.readAllString(path)) };
-		if(doc.isNil) {
-			^(ok: false, error: "scdeken's answer could not be read.", exit_code: exit)
+		if(doc.isKindOf(Dictionary).not) {
+			^this.prResponse(false, nil, "scdeken's answer could not be read.", [], exit)
 		};
-		^(ok: doc["ok"] == true, data: doc["data"], error: doc["error"], confirm: doc["confirm"] ? [], exit_code: exit)
+		^this.prResponse(doc["ok"] == true, doc["data"], doc["error"], doc["confirm"], exit)
 	}
 
 	// ---- small shared pieces

@@ -96,7 +96,7 @@ Deken {
 		var done = action ? this.prDefaultAction("remove");
 		this.prRequest((command: "list"), { |listed|
 			var item = if(listed.ok) { this.prFindItem(listed.data, name) };
-			if(item.notNil and: { item["source"] == "quark" }) { this.prRemoveQuark(name, done) } {
+			if(item.notNil and: { item["source"] == "quark" }) { this.prRemoveQuark(item["name"], done) } {
 				this.prRequest((command: "remove", package: name.asString), done)
 			}
 		})
@@ -133,9 +133,9 @@ Deken {
 	*prRemoveQuark { |name, done|
 		var response = try {
 			DekenQuarks.uninstall(name.asString);
-			(ok: true, data: (removed: name.asString), confirm: [], exit_code: 0)
+			DekenHelper.prResponse(true, Dictionary.newFrom(["removed", name.asString]), nil, [], 0)
 		} { |err|
-			(ok: false, error: err.errorString, confirm: [], exit_code: 1)
+			DekenHelper.prResponse(false, nil, err.errorString, [], 1)
 		};
 		done.value(response)
 	}

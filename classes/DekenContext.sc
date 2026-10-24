@@ -33,10 +33,6 @@ DekenContext {
 	}
 
 	*prQuark { |q|
-		^(name: q.name, url: q.url, path: q.localPath, commit: this.prCommit(q))
-	}
-
-	*prCommit { |q|
-		^try { q.git !? { |g| g.sha } }
+		^(name: q.name, url: DekenGit.url(q.localPath), path: q.localPath, commit: DekenGit.commit(q.localPath))
 	}
 }

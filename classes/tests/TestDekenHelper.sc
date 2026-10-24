@@ -211,6 +211,70 @@ TestDekenHelper : UnitTest {
 		this.assert(r[\error].find("checksum").notNil, "error mentions the checksum");
 	}
 
+	// ---- failures
+
+	test_failedQuarkInstallIsNotReportedAsSuccess {
+		var r;
+		DekenQuarks.override_((install: { |url, commit| false }));
+		r = this.await("install", { |a| Deken.install("Panola", nil, a) });
+		this.assertEquals(r.ok, false);
+		this.assert(r[\error].find("quark").notNil, "says the quark failed: " ++ r[\error]);
+		this.assertEquals(r[\after_install], nil, "no 'now recompile' advice");
+	}
+
+	test_throwingQuarkInstallIsReported {
+		var r;
+		DekenQuarks.override_((install: { |url, commit| Error("git clone failed").throw }));
+		r = this.await("install", { |a| Deken.install("Panola", nil, a) });
+		this.assertEquals(r.ok, false);
+		this.assert(r[\error].find("git clone failed").notNil, "keeps the reason");
+	}
+
+	test_failedQuarkUninstallThrows {
+		DekenQuarks.override_((uninstall: { |name| false }));
+		this.assertException({ DekenQuarks.uninstall("Panola") }, Error, "uninstall failure throws");
+		DekenQuarks.override_((checkout: { |name, commit| false }));
+		this.assertException({ DekenQuarks.checkout("Panola", "abc") }, Error, "checkout failure throws");
+	}
+
+	test_realQuarkUninstallOfUnknownNameThrows {
+		DekenQuarks.override_(nil);
+		this.assertException({ DekenQuarks.uninstall("NoSuchQuarkAnywhere") }, Error, "unknown quark is an error");
+	}
+
+	test_installConfirmedWithMissingHelperReportsFailure {
+		var r;
+		Deken.helperPath = fixtures +/+ "no-such-helper";
+		r = this.await("installConfirmed", { |a| Deken.installConfirmed("Panola", nil, (), a) });
+		this.assertEquals(r.ok, false);
+		this.assertEquals(r.confirm, []);
+		this.assert(r[\error].notNil, "has an error");
+	}
+
+	test_everyResponseHasAConfirmList {
+		var r = DekenHelper.prResponse(false, nil, "x", nil, 1);
+		this.assertEquals(r.confirm, []);
+	}
+
+	// ---- bootstrap in parallel
+
+	test_overlappingBootstrapsShareOneVerifiedDownload {
+		var a, b, failures = List.new, before;
+		Deken.helperPath = nil;
+		DekenHelper.lockPath = fixtures +/+ "lock-ok.json";
+		this.removeDownloadedHelper;
+		before = DekenHelper.downloadCount;
+		DekenHelper.ensure({ |p| a = p }, { |m| failures.add(m) });
+		DekenHelper.ensure({ |p| b = p }, { |m| failures.add(m) });
+		this.wait({ (a.notNil and: b.notNil) or: { failures.size > 0 } }, "both answered", 40);
+		this.assertEquals(failures.size, 0, "no failure: " ++ failures);
+		this.assertEquals(a, b, "same path");
+		this.assertEquals(DekenHelper.downloadCount - before, 1, "one download");
+		this.assert(File.exists(a), "helper in place");
+		this.assertEquals(PathName(DekenHelper.binDir).files.size, 1, "no leftovers");
+		this.removeDownloadedHelper;
+	}
+
 	test_sha256OfAKnownFile {
 		var file = Platform.defaultTempDir +/+ "deken-sha-test.txt";
 		var hash;
@@ -221,5 +285,71 @@ TestDekenHelper : UnitTest {
 		this.wait({ hash.notNil }, "hash computed", 20);
 		File.delete(file);
 		this.assertEquals(hash, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+	}
+}
+TestDekenGit : UnitTest {
+	var root;
+
+	setUp {
+		root = Platform.userAppSupportDir +/+ "git-test";
+		DekenHelper.prMkdirs(root);
+	}
+
+	tearDown { File.deleteAll(root) }
+
+	write { |path, text|
+		var f;
+		DekenHelper.prMkdirs(path.dirname);
+		f = File(path, "w");
+		f.write(text);
+		f.close;
+	}
+
+	sha { |c| ^String.fill(40, c) }
+
+	test_detachedHead {
+		this.write(root +/+ "a/.git/HEAD", this.sha($a) ++ "\n");
+		this.assertEquals(DekenGit.commit(root +/+ "a"), this.sha($a));
+	}
+
+	test_looseBranchRef {
+		this.write(root +/+ "a/.git/HEAD", "ref: refs/heads/main\n");
+		this.write(root +/+ "a/.git/refs/heads/main", this.sha($b) ++ "\n");
+		this.assertEquals(DekenGit.commit(root +/+ "a"), this.sha($b));
+	}
+
+	test_packedRef {
+		this.write(root +/+ "a/.git/HEAD", "ref: refs/heads/main\n");
+		this.write(root +/+ "a/.git/packed-refs", "# pack-refs\n" ++ this.sha($c) ++ " refs/heads/other\n" ++ this.sha($d) ++ " refs/heads/main\n");
+		this.assertEquals(DekenGit.commit(root +/+ "a"), this.sha($d));
+	}
+
+	test_gitFilePointsElsewhere {
+		this.write(root +/+ "store/wt/HEAD", this.sha($e) ++ "\n");
+		this.write(root +/+ "a/.git", "gitdir: " ++ root +/+ "store/wt\n");
+		this.assertEquals(DekenGit.commit(root +/+ "a"), this.sha($e));
+	}
+
+	test_relativeGitFileAndWorktreeCommonDir {
+		this.write(root +/+ "main/.git/HEAD", "ref: refs/heads/main\n");
+		this.write(root +/+ "main/.git/refs/heads/feature", this.sha($f) ++ "\n");
+		this.write(root +/+ "main/.git/config", "[remote \"origin\"]\n\turl = https://example.org/x.git\n");
+		this.write(root +/+ "main/.git/worktrees/w/HEAD", "ref: refs/heads/feature\n");
+		this.write(root +/+ "main/.git/worktrees/w/commondir", "../..\n");
+		this.write(root +/+ "w/.git", "gitdir: ../main/.git/worktrees/w\n");
+		this.assertEquals(DekenGit.commit(root +/+ "w"), this.sha($f));
+		this.assertEquals(DekenGit.url(root +/+ "w"), "https://example.org/x.git");
+	}
+
+	test_originUrlIgnoresOtherRemotes {
+		this.write(root +/+ "a/.git/HEAD", this.sha($a));
+		this.write(root +/+ "a/.git/config", "[core]\n\tbare = false\n[remote \"fork\"]\n\turl = https://example.org/fork.git\n[remote \"origin\"]\n\turl = https://example.org/real.git\n\tfetch = +refs/heads/*:refs/remotes/origin/*\n");
+		this.assertEquals(DekenGit.url(root +/+ "a"), "https://example.org/real.git");
+	}
+
+	test_notAGitFolder {
+		this.write(root +/+ "plain/readme.txt", "hi");
+		this.assertEquals(DekenGit.commit(root +/+ "plain"), nil);
+		this.assertEquals(DekenGit.url(root +/+ "plain"), nil);
 	}
 }
