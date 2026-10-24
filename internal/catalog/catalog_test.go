@@ -121,7 +121,7 @@ func newEnv(t *testing.T, url string, k testKey) env {
 			URL:             url,
 			TrustedKeysPath: filepath.Join(dir, "trusted-keys"),
 			EmbeddedKey:     k.pub,
-			StatePath:       filepath.Join(dir, "last-generated.txt"),
+			Dir:             filepath.Join(dir, "catalog"),
 			Log:             log,
 		},
 	}
@@ -155,8 +155,8 @@ func TestLoadRejectsBadSignature(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "signature") || ix != nil {
 		t.Fatalf("got %v, %v; want a signature error and no index", ix, err)
 	}
-	if _, err := os.Stat(e.opts.StatePath); err == nil {
-		t.Error("state was written for a rejected index")
+	if files, _ := filepath.Glob(filepath.Join(e.opts.Dir, "*", "*")); len(files) != 0 {
+		t.Errorf("files written for a rejected index: %v", files)
 	}
 }
 
@@ -208,14 +208,10 @@ func TestLoadOfflineVerifiesCache(t *testing.T) {
 	if err := e.load(); err != nil {
 		t.Fatal(err)
 	}
-	// Tamper with the cached index on disk.
-	bodies, _ := filepath.Glob(filepath.Join(e.client.CacheDir, "*.body"))
-	for _, b := range bodies {
-		data, _ := os.ReadFile(b)
-		if strings.Contains(string(data), "schema") {
-			os.WriteFile(b, bytes.Replace(data, []byte("mi-ugens"), []byte("evil-pkg"), 1), 0o644)
-		}
-	}
+	// Tamper with the saved index on disk.
+	saved := e.savedIndexPath(t)
+	data, _ := os.ReadFile(saved)
+	os.WriteFile(saved, bytes.Replace(data, []byte("mi-ugens"), []byte("evil-pkg"), 1), 0o644)
 	e.opts.Offline = true
 	if err := e.load(); err == nil || !strings.Contains(err.Error(), "signature") {
 		t.Fatalf("got %v; want a signature error for the tampered cache", err)
@@ -256,9 +252,19 @@ func TestLoadRejectsRollback(t *testing.T) {
 	}
 	srv.set(signed(t, k[0], indexJSON(t1, ""))) // validly signed, but older
 	e.opts.MaxAge = time.Nanosecond
-	err := e.load()
-	if err == nil || !strings.Contains(err.Error(), "older than the one already seen") {
-		t.Fatalf("got %v", err)
+	// The replay is refused (the reason is logged) and the verified T2 pair is used.
+	if got := e.loadedGenerated(t); !got.Equal(mustTime(t2)) {
+		t.Errorf("generated = %v; want %s", got, t2)
+	}
+	if !strings.Contains(e.log.String(), "older than the one already seen") {
+		t.Errorf("log = %q", e.log.String())
+	}
+	if got := e.storedGenerated(t); got != t2 {
+		t.Errorf("stored state = %s; want %s", got, t2)
+	}
+	e.opts.Offline = true
+	if got := e.loadedGenerated(t); !got.Equal(mustTime(t2)) {
+		t.Errorf("offline generated = %v; want %s", got, t2)
 	}
 }
 
@@ -352,4 +358,80 @@ func mustTime(s string) time.Time {
 		panic(err)
 	}
 	return v
+}
+
+func (e env) savedIndexPath(t *testing.T) string {
+	t.Helper()
+	paths, _ := filepath.Glob(filepath.Join(e.opts.Dir, "*", "index.json"))
+	if len(paths) != 1 {
+		t.Fatalf("saved index files = %v", paths)
+	}
+	return paths[0]
+}
+
+func (e env) storedGenerated(t *testing.T) string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(filepath.Dir(e.savedIndexPath(t)), "last-generated.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return strings.TrimSpace(string(data))
+}
+
+// loadedGenerated loads and returns the generated time of the result.
+func (e env) loadedGenerated(t *testing.T) time.Time {
+	t.Helper()
+	ix, err := Load(context.Background(), e.client, e.opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ix.Generated
+}
+
+func TestLoadBrokenSignatureKeepsGoodPairForOffline(t *testing.T) {
+	k := testKeys()
+	srv := newServer(t, nil, nil)
+	srv.set(signed(t, k[0], indexJSON(t1, "")))
+	e := newEnv(t, srv.url(), k[0])
+	if err := e.load(); err != nil {
+		t.Fatal(err)
+	}
+	idx, _ := signed(t, k[0], indexJSON(t2, ""))
+	srv.set(idx, nil)
+	srv.breakSig()
+	e.opts.MaxAge = time.Nanosecond
+	if err := e.load(); err != nil {
+		t.Fatal(err)
+	}
+	e.opts.Offline = true
+	if got := e.loadedGenerated(t); !got.Equal(mustTime(t1)) {
+		t.Errorf("offline generated = %v; want %s", got, t1)
+	}
+}
+
+func TestLoadCaptivePortalFallsBackToVerifiedPair(t *testing.T) {
+	k := testKeys()
+	srv := newServer(t, nil, nil)
+	srv.set(signed(t, k[0], indexJSON(t1, "")))
+	e := newEnv(t, srv.url(), k[0])
+	if err := e.load(); err != nil {
+		t.Fatal(err)
+	}
+	srv.set([]byte("<html>please log in</html>"), []byte("<html>please log in</html>"))
+	e.opts.MaxAge = time.Nanosecond
+	if got := e.loadedGenerated(t); !got.Equal(mustTime(t1)) {
+		t.Errorf("generated = %v; want %s", got, t1)
+	}
+	if !strings.Contains(e.log.String(), "could not be verified") || !strings.Contains(e.log.String(), "using the package list from") {
+		t.Errorf("log = %q", e.log.String())
+	}
+}
+
+func TestLoadPortalWithoutSavedPairFails(t *testing.T) {
+	k := testKeys()
+	srv := newServer(t, []byte("<html></html>"), []byte("<html></html>"))
+	e := newEnv(t, srv.url(), k[0])
+	if err := e.load(); err == nil || !strings.Contains(err.Error(), "signature") {
+		t.Fatalf("got %v", err)
+	}
 }
