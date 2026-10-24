@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -153,21 +154,39 @@ func runIndexKeygen(_ context.Context, req Request, s *session) (any, error) {
 }
 
 // keyPassword reads the new key's password from the environment variable env
-// when given, else from one line on standard input.
+// when given, else from standard input: typed twice, and both must agree.
 func keyPassword(env string, s *session) (string, error) {
-	password := ""
 	if env != "" {
-		if password = os.Getenv(env); password == "" {
+		password := os.Getenv(env)
+		if password == "" {
 			return "", fmt.Errorf("the environment variable %s is empty or not set", env)
 		}
 		return password, nil
 	}
-	fmt.Fprint(s.deps.Stderr, "Password for the new signing key: ")
-	line, err := bufio.NewReader(s.deps.Stdin).ReadString('\n')
+	in := bufio.NewReader(s.deps.Stdin)
+	password, err := askPassword(in, s.deps.Stderr, "Password for the new signing key: ")
+	if err != nil {
+		return "", err
+	}
+	again, err := askPassword(in, s.deps.Stderr, "Type the password again: ")
+	if err != nil {
+		return "", err
+	}
+	if again != password {
+		return "", errors.New("the two passwords do not match; nothing was written")
+	}
+	return password, nil
+}
+
+// askPassword writes prompt to out and reads one non-empty line from in.
+func askPassword(in *bufio.Reader, out io.Writer, prompt string) (string, error) {
+	fmt.Fprint(out, prompt)
+	line, err := in.ReadString('\n')
 	if err != nil && line == "" {
 		return "", errors.New("no password was given")
 	}
-	if password = strings.TrimRight(line, "\r\n"); password == "" {
+	password := strings.TrimRight(line, "\r\n")
+	if password == "" {
 		return "", errors.New("the password must not be empty")
 	}
 	return password, nil

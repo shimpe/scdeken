@@ -107,13 +107,27 @@ func TestKeygenSignRoundTrip(t *testing.T) {
 
 func TestKeygenPromptsOnStdin(t *testing.T) {
 	dir := t.TempDir()
-	code, _, errOut := runMain(t, Deps{Stdin: strings.NewReader("secret\n")}, "index", "keygen", "--out-dir", dir)
+	code, _, errOut := runMain(t, Deps{Stdin: strings.NewReader("secret\nsecret\n")}, "index", "keygen", "--out-dir", dir)
 	if code != 0 {
 		t.Fatalf("exit %d: %s", code, errOut)
+	}
+	if !strings.Contains(errOut, "again") {
+		t.Errorf("the password was not asked twice: %q", errOut)
 	}
 	key, _ := os.ReadFile(filepath.Join(dir, "scdeken.key"))
 	if _, err := sign.Sign(key, "secret", []byte("m")); err != nil {
 		t.Errorf("key does not open with the typed password: %v", err)
+	}
+}
+
+func TestKeygenRefusesMismatchedPasswords(t *testing.T) {
+	dir := t.TempDir()
+	code, _, errOut := runMain(t, Deps{Stdin: strings.NewReader("secret\nsecert\n")}, "index", "keygen", "--out-dir", dir)
+	if code != 1 || !strings.Contains(errOut, "do not match") {
+		t.Fatalf("exit %d: %s", code, errOut)
+	}
+	if entries, _ := os.ReadDir(dir); len(entries) != 0 {
+		t.Errorf("files written: %v", entries)
 	}
 }
 
