@@ -108,3 +108,23 @@ func TestPlanAddsDuplicatesConfirm(t *testing.T) {
 		t.Errorf("Confirm = %v, Duplicates = %+v", p.Confirm, p.Duplicates)
 	}
 }
+
+func TestPlanReportsOtherManagedPackageFolder(t *testing.T) {
+	ext := filepath.Join(t.TempDir(), "Extensions")
+	managed := filepath.Join(ext, "sc-deken")
+	writeFile(t, filepath.Join(managed, "other", "classes", "Foo.sc"), "FMX6 : UGen { }")
+	writeFile(t, filepath.Join(managed, "fmx6", "FMX6.scx"), "x")
+	s := newService(t)
+	s.Ctx.ExtensionDir = ext
+	s.Paths = scenv.Paths{Managed: managed}
+	s.Index.Packages[0].Classes = []string{"FMX6"}
+
+	p, err := s.Plan(context.Background(), "fmx6", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Duplicate{{Path: filepath.Join(managed, "other"), Matched: "FMX6"}}
+	if !reflect.DeepEqual(p.Duplicates, want) {
+		t.Errorf("Duplicates = %+v, want %+v", p.Duplicates, want)
+	}
+}
