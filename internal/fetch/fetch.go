@@ -102,17 +102,21 @@ func (c *Client) Cached(rawURL string) ([]byte, time.Time, bool) {
 }
 
 // store caches a body and its ETag. Cache problems never fail a fetch.
+// The body is written first, and the ETag is removed if either write fails,
+// so a stored ETag never sits next to an older body (the worst case is a
+// harmless refetch).
 func (c *Client) store(rawURL string, body []byte, etag string) {
 	if c.CacheDir == "" || os.MkdirAll(c.CacheDir, 0o755) != nil {
 		return
 	}
 	etagPath := c.path(rawURL, "etag")
-	if etag == "" {
+	if writeAtomic(c.path(rawURL, "body"), body) != nil || etag == "" {
 		_ = os.Remove(etagPath)
-	} else if writeAtomic(etagPath, []byte(etag)) != nil {
 		return
 	}
-	_ = writeAtomic(c.path(rawURL, "body"), body)
+	if writeAtomic(etagPath, []byte(etag)) != nil {
+		_ = os.Remove(etagPath)
+	}
 }
 
 func (c *Client) path(rawURL, ext string) string {

@@ -146,3 +146,36 @@ func TestDownloadFileURL(t *testing.T) {
 		t.Errorf("dst = %q", got)
 	}
 }
+
+func TestFailedBodyWriteLeavesNoETag(t *testing.T) {
+	var seen []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Header.Get("If-None-Match"))
+		if len(seen) == 1 {
+			w.Header().Set("ETag", `"v1"`)
+			_, _ = w.Write([]byte("old"))
+			return
+		}
+		w.Header().Set("ETag", `"v2"`)
+		_, _ = w.Write([]byte("new"))
+	}))
+	defer srv.Close()
+
+	c := New(t.TempDir())
+	if _, err := c.Get(context.Background(), srv.URL); err != nil {
+		t.Fatal(err)
+	}
+	// A directory where the temp file belongs makes the body write fail.
+	if err := os.Mkdir(c.path(srv.URL, "body")+".tmp", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := c.Get(context.Background(), srv.URL); err != nil || string(got) != "new" {
+		t.Fatalf("second Get = %q, %v", got, err)
+	}
+	if _, err := c.Get(context.Background(), srv.URL); err != nil {
+		t.Fatal(err)
+	}
+	if len(seen) != 3 || seen[1] != `"v1"` || seen[2] != "" {
+		t.Errorf("If-None-Match per request = %q, want [\"\" \"v1\" \"\"]", seen)
+	}
+}
