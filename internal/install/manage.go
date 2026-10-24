@@ -32,7 +32,8 @@ type Item struct {
 	Commit          string             `json:"commit"`
 	Kind            string             `json:"kind"`
 	Path            string             `json:"path"`
-	Source          string             `json:"source"` // "managed" | "quark" | "external"
+	QuarkName       string             `json:"quark_name,omitempty"` // a quark's own name, which may differ from Name
+	Source          string             `json:"source"`               // "managed" | "quark" | "external"
 	Trust           string             `json:"trust,omitempty"`
 	Latest          string             `json:"latest,omitempty"`
 	UpdateAvailable bool               `json:"update_available"`
@@ -85,11 +86,14 @@ func (s *Service) entryItem(e state.Entry) Item {
 	return it
 }
 
-// quarkItem describes a quark reported by SuperCollider.
+// quarkItem describes a quark reported by SuperCollider. A quark the index
+// lists (same repository) is shown under its package name, which may differ
+// from the quark's own name.
 func (s *Service) quarkItem(q scenv.Quark) Item {
-	it := Item{Name: q.Name, Commit: q.Commit, Kind: "quark", Path: q.Path, Source: SourceQuark, repo: q.URL}
+	it := Item{Name: q.Name, QuarkName: q.Name, Commit: q.Commit, Kind: "quark", Path: q.Path, Source: SourceQuark, repo: q.URL}
 	pkg, ok := s.Index.FindRepo(q.URL)
 	if ok {
+		it.Name = pkg.Name
 		it.Version = releaseForCommit(pkg, q.Commit)
 	}
 	s.describe(&it, pkg)
@@ -182,10 +186,8 @@ func (s *Service) Remove(name string) error {
 func (s *Service) removable(name string) (state.Entry, error) {
 	entry, ok := s.State.Packages[strings.ToLower(name)]
 	if !ok {
-		for _, q := range s.Ctx.Quarks {
-			if strings.EqualFold(q.Name, name) {
-				return state.Entry{}, fmt.Errorf("remove quarks from SuperCollider (Deken.remove does this)")
-			}
+		if s.isQuark(name) {
+			return state.Entry{}, fmt.Errorf("remove quarks from SuperCollider (Deken.remove does this)")
 		}
 		return state.Entry{}, fmt.Errorf("%s is not installed by sc-deken", name)
 	}
@@ -196,6 +198,20 @@ func (s *Service) removable(name string) (state.Entry, error) {
 		return state.Entry{}, fmt.Errorf("%s is not in sc-deken's folder; remove it by hand from %s", entry.Name, entry.Path)
 	}
 	return entry, nil
+}
+
+// isQuark reports whether name is an installed quark, by its own name or by
+// its package name (known only with the package list).
+func (s *Service) isQuark(name string) bool {
+	for _, q := range s.Ctx.Quarks {
+		if strings.EqualFold(q.Name, name) {
+			return true
+		}
+		if s.Index != nil && strings.EqualFold(s.quarkItem(q).Name, name) {
+			return true
+		}
+	}
+	return false
 }
 
 // forget drops entry from the state file.

@@ -170,3 +170,47 @@ func TestQuarantineKeepsWhatAnotherProcessSaved(t *testing.T) {
 		t.Errorf("saved = %+v, %v", saved, err)
 	}
 }
+
+// A quark's folder name (ScTimeline) need not be its package name
+// (sc-timeline); the list shows the package name and keeps both.
+func TestListNamesAQuarkByItsPackage(t *testing.T) {
+	s := applyService(t)
+	s.Ctx.Quarks = []scenv.Quark{{Name: "PanolaQuark", URL: "https://github.com/example/Panola.git", Path: "/q/PanolaQuark", Commit: panolaCommit}}
+	items := s.List()
+	if len(items) != 1 {
+		t.Fatalf("items = %+v", items)
+	}
+	if q := items[0]; q.Name != "Panola" || q.QuarkName != "PanolaQuark" || q.Path != "/q/PanolaQuark" || q.Version != "1.0.0" {
+		t.Errorf("item = %+v", q)
+	}
+	if err := s.Remove("Panola"); err == nil || !strings.Contains(err.Error(), "Deken.remove") {
+		t.Errorf("remove by package name: %v", err)
+	}
+}
+
+func TestListKeepsTheNameOfAnUnknownQuark(t *testing.T) {
+	s := applyService(t)
+	s.Ctx.Quarks = []scenv.Quark{{Name: "Mine", URL: "https://github.com/me/Mine", Path: "/q/Mine"}}
+	if items := s.List(); len(items) != 1 || items[0].Name != "Mine" || items[0].QuarkName != "Mine" {
+		t.Errorf("items = %+v", items)
+	}
+}
+
+// remove runs without the package list (it works offline).
+func TestRemoveRefusesAQuarkWithoutThePackageList(t *testing.T) {
+	s := applyService(t)
+	s.Index = nil
+	s.Ctx.Quarks = []scenv.Quark{{Name: "Mine", URL: "https://github.com/me/Mine", Path: "/q/Mine"}}
+	if err := s.Remove("Mine"); err == nil || !strings.Contains(err.Error(), "Deken.remove") {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestRemoveUnknownWithoutThePackageList(t *testing.T) {
+	s := applyService(t)
+	s.Index = nil
+	s.Ctx.Quarks = []scenv.Quark{{Name: "Mine", URL: "https://github.com/me/Mine", Path: "/q/Mine"}}
+	if err := s.Remove("Other"); err == nil || !strings.Contains(err.Error(), "not installed by sc-deken") {
+		t.Errorf("err = %v", err)
+	}
+}
