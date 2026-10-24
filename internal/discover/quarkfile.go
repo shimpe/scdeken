@@ -17,11 +17,12 @@ type QuarkFile struct {
 // empty; text without a closed "( ... )" or with an unterminated string is an
 // error.
 func ParseQuarkFile(src string) (QuarkFile, error) {
-	open := strings.Index(src, "(")
-	if open < 0 {
+	p := &quarkParser{src: src}
+	p.skipTrivia() // comments before the event may contain parentheses
+	if p.eof() || src[p.pos] != '(' {
 		return QuarkFile{}, errors.New("parse .quark file: no ( ... ) event found")
 	}
-	p := &quarkParser{src: src, pos: open + 1}
+	p.pos++
 	q, err := p.event()
 	if err != nil {
 		return QuarkFile{}, fmt.Errorf("parse .quark file: %w", err)

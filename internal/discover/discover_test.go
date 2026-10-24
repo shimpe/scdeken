@@ -202,3 +202,15 @@ func TestScanMalformedQuarkKeepsFindings(t *testing.T) {
 		t.Fatalf("ugens = %v", s.UGens)
 	}
 }
+
+func TestParseQuarkFileLeadingComments(t *testing.T) {
+	for _, src := range []string{
+		"// my quark (v2)\n( name: \"X\" )",
+		"/* header (old) ) */\n( name: \"X\" )",
+	} {
+		q, err := ParseQuarkFile(src)
+		if err != nil || q.Name != "X" {
+			t.Errorf("%q: q = %+v, err = %v", src, q, err)
+		}
+	}
+}
