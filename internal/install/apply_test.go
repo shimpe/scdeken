@@ -314,7 +314,7 @@ func TestApplyKeepRecordsExternal(t *testing.T) {
 		t.Fatalf("res = %+v err = %v", res, err)
 	}
 	e := s.State.Packages["fmx6"]
-	if e.Route != state.External || e.Path != dup {
+	if e.Route != state.External || e.Path != dup || e.Version != "" || e.Commit != "" {
 		t.Errorf("entry = %+v", e)
 	}
 	if !exists(filepath.Join(dup, "FMX6.scx")) || exists(filepath.Join(s.Paths.Managed, "fmx6")) {
@@ -369,5 +369,125 @@ func TestApplyUpdateReplacesOldVersion(t *testing.T) {
 	dir := filepath.Join(s.Paths.Managed, "fmx6")
 	if exists(filepath.Join(dir, "Gone.scx")) || !exists(filepath.Join(dir, "FMX6.scx")) || exists(dir+"/../.old-fmx6") {
 		t.Error("update did not replace the old version cleanly")
+	}
+}
+
+// crossDeviceError is what the OS reports for a rename between drives.
+func crossDeviceError() error {
+	if runtime.GOOS == "windows" {
+		return &os.LinkError{Op: "rename", Err: syscall.Errno(17)}
+	}
+	return &os.LinkError{Op: "rename", Err: syscall.EXDEV}
+}
+
+// failRename makes rename fail with err for every move out of from.
+func failRename(t *testing.T, err error, from ...string) {
+	t.Helper()
+	real := rename
+	rename = func(src, dst string) error {
+		for _, f := range from {
+			if src == f {
+				return err
+			}
+		}
+		return real(src, dst)
+	}
+	t.Cleanup(func() { rename = real })
+}
+
+func TestApplyRejectsUnknownChoice(t *testing.T) {
+	s := applyService(t)
+	_, err := s.ApplyWith(context.Background(), Plan{Package: "fmx6", Route: RoutePrebuilt}, Choices{OnDuplicate: "yes"})
+	want := `unknown choice for existing copies: "yes" (use replace or keep)`
+	if err == nil || err.Error() != want {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestApplyBackupFailureRestoresEverything(t *testing.T) {
+	s := applyService(t)
+	p, dup := duplicatePlan(t, s)
+	second := filepath.Join(s.Ctx.ExtensionDir, "second")
+	writeTestFile(t, filepath.Join(second, "FMX6.scx"), "other")
+	p.Duplicates = append(p.Duplicates, Duplicate{Path: second, Matched: "FMX6.scx"})
+	failRename(t, lockedError(), second)
+
+	_, err := s.ApplyWith(context.Background(), p, Choices{OnDuplicate: "replace"})
+	if err == nil || !strings.Contains(err.Error(), "Couldn't move "+second+" out of the way") {
+		t.Fatalf("err = %v", err)
+	}
+	if errors.Is(err, ErrInUse) || strings.Contains(err.Error(), "s.quit") {
+		t.Errorf("backup failure was reported as server in use: %v", err)
+	}
+	for _, d := range []string{dup, second} {
+		if !exists(filepath.Join(d, "FMX6.scx")) {
+			t.Errorf("%s not restored", d)
+		}
+	}
+	if exists(filepath.Join(s.Paths.Managed, "fmx6")) || exists(filepath.Join(s.Paths.Managed, ".staging")) {
+		t.Error("new install or staging left behind")
+	}
+	if len(s.State.Packages) != 0 || exists(s.Paths.State) {
+		t.Error("state changed")
+	}
+}
+
+func TestApplyBackupAcrossDrivesCopiesThenRemoves(t *testing.T) {
+	s := applyService(t)
+	p, dup := duplicatePlan(t, s)
+	writeTestFile(t, filepath.Join(dup, "sub", "deep.txt"), "deep")
+	failRename(t, crossDeviceError(), dup)
+
+	res, err := s.ApplyWith(context.Background(), p, Choices{OnDuplicate: "replace"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exists(dup) {
+		t.Error("source not removed after copy")
+	}
+	if len(res.BackedUp) != 1 {
+		t.Fatalf("BackedUp = %v", res.BackedUp)
+	}
+	for file, want := range map[string]string{"FMX6.scx": "mine", "sub/deep.txt": "deep"} {
+		got, err := os.ReadFile(filepath.Join(res.BackedUp[0], filepath.FromSlash(file)))
+		if err != nil || string(got) != want {
+			t.Errorf("%s = %q, %v", file, got, err)
+		}
+	}
+}
+
+func TestSwapRestoreFailureNamesOldFolder(t *testing.T) {
+	root := t.TempDir()
+	target := filepath.Join(root, "fmx6")
+	staging := filepath.Join(root, ".staging", "fmx6")
+	old := filepath.Join(root, ".old-fmx6")
+	writeTestFile(t, filepath.Join(target, "a.scx"), "old")
+	writeTestFile(t, filepath.Join(staging, "a.scx"), "new")
+	failRename(t, lockedError(), staging, old)
+
+	err := swapIn(staging, target)
+	if err == nil || !strings.Contains(err.Error(), "your previous copy is in "+old) || !errors.Is(err, ErrInUse) {
+		t.Fatalf("err = %v", err)
+	}
+	if !exists(filepath.Join(old, "a.scx")) {
+		t.Error("previous copy lost")
+	}
+}
+
+func TestSwapRestoresInterruptedLeftover(t *testing.T) {
+	root := t.TempDir()
+	target := filepath.Join(root, "fmx6")
+	staging := filepath.Join(root, ".staging", "fmx6")
+	old := filepath.Join(root, ".old-fmx6")
+	writeTestFile(t, filepath.Join(old, "a.scx"), "only copy")
+	writeTestFile(t, filepath.Join(staging, "a.scx"), "new")
+	failRename(t, lockedError(), staging)
+
+	if err := swapIn(staging, target); err == nil {
+		t.Fatal("want error")
+	}
+	got, err := os.ReadFile(filepath.Join(target, "a.scx"))
+	if err != nil || string(got) != "only copy" {
+		t.Errorf("leftover not restored: %q, %v", got, err)
 	}
 }

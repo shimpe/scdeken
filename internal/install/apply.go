@@ -2,6 +2,7 @@ package install
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -48,6 +49,9 @@ func (s *Service) Apply(ctx context.Context, p Plan) (Result, error) {
 // ApplyWith carries out a plan. Files are built in a staging folder and
 // moved into place only when complete, so a failure leaves nothing behind.
 func (s *Service) ApplyWith(ctx context.Context, p Plan, c Choices) (Result, error) {
+	if err := checkChoice(c); err != nil {
+		return Result{}, err
+	}
 	if err := checkConfirmed(p, c); err != nil {
 		return Result{}, err
 	}
@@ -58,21 +62,33 @@ func (s *Service) ApplyWith(ctx context.Context, p Plan, c Choices) (Result, err
 	if c.OnDuplicate == "keep" && len(p.Duplicates) > 0 {
 		return s.keepExisting(res)
 	}
-	target, err := s.install(ctx, p)
+	var dups []Duplicate
+	if c.OnDuplicate == "replace" {
+		dups = p.Duplicates
+	}
+	target, backups, err := s.install(ctx, p, dups)
 	if err != nil {
-		return Result{}, err
+		return res, err // install undoes its own work, so nothing is installed
 	}
 	res.InstalledTo = target
-	if err := s.record(p, target); err != nil {
-		return Result{}, err
+	for _, b := range backups {
+		res.BackedUp = append(res.BackedUp, b.dst)
 	}
-	if c.OnDuplicate == "replace" {
-		if res.BackedUp, err = s.backUp(p.Duplicates); err != nil {
-			return Result{}, fmt.Errorf("%s is installed, but its old copy could not be moved aside: %w", p.Package, err)
-		}
+	if err := s.record(p, target); err != nil {
+		return res, err // the files are in place even though state is not saved
 	}
 	s.progress(1, "Done")
 	return res, nil
+}
+
+// checkChoice rejects an OnDuplicate answer that is neither empty, "replace"
+// nor "keep".
+func checkChoice(c Choices) error {
+	switch c.OnDuplicate {
+	case "", "replace", "keep":
+		return nil
+	}
+	return fmt.Errorf("unknown choice for existing copies: %q (use replace or keep)", c.OnDuplicate)
 }
 
 // checkConfirmed returns a ConfirmationError for every confirmation the plan
@@ -98,7 +114,8 @@ func checkConfirmed(p Plan, c Choices) error {
 // keepExisting records the user's own copy instead of installing.
 func (s *Service) keepExisting(res Result) (Result, error) {
 	entry := s.entryFor(res.Plan, res.Plan.Duplicates[0].Path)
-	entry.Route, entry.Platform = state.External, ""
+	// The version of a copy the user made is unknown; never claim the plan's.
+	entry.Route, entry.Platform, entry.Version, entry.Commit = state.External, "", "", ""
 	if err := s.save(entry); err != nil {
 		return Result{}, err
 	}
@@ -106,36 +123,49 @@ func (s *Service) keepExisting(res Result) (Result, error) {
 	return res, nil
 }
 
-// install fills a staging folder and swaps it into the managed folder. It
-// returns the package folder. The staging folder is gone afterwards.
-func (s *Service) install(ctx context.Context, p Plan) (target string, err error) {
+// install fills a staging folder, moves dups out of the way and swaps the
+// staging folder into the managed folder. It returns the package folder and
+// the backups made. On error nothing has changed and the staging folder is
+// gone.
+func (s *Service) install(ctx context.Context, p Plan, dups []Duplicate) (target string, backups []backup, err error) {
 	name := strings.ToLower(p.Package)
 	staging := filepath.Join(s.Paths.Managed, ".staging", name)
 	target = filepath.Join(s.Paths.Managed, name)
 	if err := os.RemoveAll(staging); err != nil {
-		return "", fmt.Errorf("clear old staging folder %s: %w", staging, err)
+		return "", nil, fmt.Errorf("clear old staging folder %s: %w", staging, err)
 	}
 	defer func() {
 		os.RemoveAll(staging)
 		os.Remove(filepath.Dir(staging)) // only succeeds when empty
 	}()
 	if err := os.MkdirAll(filepath.Dir(staging), 0o755); err != nil {
-		return "", fmt.Errorf("create staging folder: %w", err)
+		return "", nil, fmt.Errorf("create staging folder: %w", err)
 	}
+	if err := s.stage(ctx, p, staging); err != nil {
+		return "", nil, err
+	}
+	if backups, err = s.backUp(dups); err != nil {
+		return "", nil, err
+	}
+	fmt.Fprintf(s.logger(), "Installing %s into %s\n", p.Package, target)
+	if err := swapIn(staging, target); err != nil {
+		return "", nil, errors.Join(err, s.restore(backups))
+	}
+	return target, backups, nil
+}
+
+// stage builds the finished package in staging.
+func (s *Service) stage(ctx context.Context, p Plan, staging string) error {
 	if err := s.fill(ctx, p, staging); err != nil {
-		return "", err
+		return err
 	}
 	if p.Kind == recipe.KindPluginQuark {
 		if err := stripClasses(staging); err != nil {
-			return "", err
+			return err
 		}
 	}
 	s.clearQuarantine(ctx, staging)
-	fmt.Fprintf(s.logger(), "Installing %s into %s\n", p.Package, target)
-	if err := swapIn(staging, target); err != nil {
-		return "", err
-	}
-	return target, nil
+	return nil
 }
 
 // fill puts the package's plugin files into staging.
@@ -302,9 +332,13 @@ func (s *Service) save(entry state.Entry) error {
 	return nil
 }
 
-// backUp moves each duplicate under Backup/<timestamp>/ and returns the new
-// locations. Nothing is ever deleted.
-func (s *Service) backUp(dups []Duplicate) ([]string, error) {
+// backup is one existing copy moved aside.
+type backup struct{ orig, dst string }
+
+// backUp moves each duplicate under Backup/<timestamp>/. Nothing is ever
+// deleted. If one cannot be moved, the ones already moved are put back and
+// the error names the path that failed.
+func (s *Service) backUp(dups []Duplicate) ([]backup, error) {
 	if len(dups) == 0 {
 		return nil, nil
 	}
@@ -312,16 +346,29 @@ func (s *Service) backUp(dups []Duplicate) ([]string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("create backup folder: %w", err)
 	}
-	var moved []string
+	var done []backup
 	for _, d := range dups {
 		dst := freePath(filepath.Join(dir, filepath.Base(d.Path)))
-		if err := rename(d.Path, dst); err != nil {
-			return moved, swapError(filepath.Base(d.Path), err)
+		if err := moveTree(d.Path, dst); err != nil {
+			err = fmt.Errorf("Couldn't move %s out of the way (%w). It may need administrator rights, or SuperCollider may be using it.", d.Path, err)
+			return nil, errors.Join(err, s.restore(done))
 		}
 		fmt.Fprintf(s.logger(), "Moved your old copy %s to %s\n", d.Path, dst)
-		moved = append(moved, dst)
+		done = append(done, backup{orig: d.Path, dst: dst})
 	}
-	return moved, nil
+	return done, nil
+}
+
+// restore puts backed-up copies back where they were.
+func (s *Service) restore(backups []backup) error {
+	var errs []error
+	for i := len(backups) - 1; i >= 0; i-- {
+		b := backups[i]
+		if err := moveTree(b.dst, b.orig); err != nil {
+			errs = append(errs, fmt.Errorf("your copy of %s is now in %s: %w", b.orig, b.dst, err))
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // freePath returns path, or path-2, path-3... when it is taken.

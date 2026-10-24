@@ -41,21 +41,43 @@ func swapError(name string, err error) error {
 func swapIn(staging, target string) error {
 	name := filepath.Base(target)
 	old := filepath.Join(filepath.Dir(target), ".old-"+name)
-	if err := os.RemoveAll(old); err != nil {
-		return fmt.Errorf("clear leftover %s: %w", old, err)
+	if err := clearLeftover(old, target); err != nil {
+		return err
 	}
 	hadOld, err := moveAside(target, old)
 	if err != nil {
 		return swapError(name, err)
 	}
 	if err := rename(staging, target); err != nil {
+		err = swapError(name, err)
 		if hadOld {
-			_ = rename(old, target)
+			if rerr := rename(old, target); rerr != nil {
+				err = errors.Join(err, fmt.Errorf("your previous copy is in %s: %w", old, rerr))
+			}
 		}
-		return swapError(name, err)
+		return err
 	}
 	if hadOld {
 		_ = os.RemoveAll(old) // only a leftover; the next install clears it too
+	}
+	return nil
+}
+
+// clearLeftover deals with an ".old" folder from an earlier, interrupted
+// swap. When target is missing, old holds the only copy, so it is put back
+// instead of deleted.
+func clearLeftover(old, target string) error {
+	if _, err := os.Lstat(old); err != nil {
+		return nil // nothing left over
+	}
+	if _, err := os.Lstat(target); os.IsNotExist(err) {
+		if err := rename(old, target); err != nil {
+			return fmt.Errorf("an earlier update was interrupted; your previous copy is in %s: %w", old, err)
+		}
+		return nil
+	}
+	if err := os.RemoveAll(old); err != nil {
+		return fmt.Errorf("clear leftover %s: %w", old, err)
 	}
 	return nil
 }
