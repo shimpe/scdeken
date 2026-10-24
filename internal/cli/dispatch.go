@@ -18,6 +18,7 @@ type Deps struct {
 	Now         func() time.Time
 	EmbeddedKey string
 	Stderr      io.Writer
+	GitHubURL   string // GitHub API address; tests point it at a fake, "" means the real one
 }
 
 func (d Deps) withDefaults() Deps {

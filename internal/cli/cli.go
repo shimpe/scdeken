@@ -29,6 +29,9 @@ const usageText = `usage: scdeken [--context <file>] [--offline] [--index-url <u
 commands:
   platform | search | info | plan | install | remove | list | updates
   doctor | advisories check | advisories keep | quarantine | refresh | version
+  recipe new <github-url> [--out <file>]
+  recipe check <file> [--build] [--sc-version 3.14.1]
+  recipe approve <file> <version> <commit>
   run <request.json> <result.json>`
 
 // global holds the flags that come before the command name.
@@ -84,12 +87,20 @@ func runFlags(g global, words []string, stdout, stderr io.Writer, deps Deps) int
 		return exitError
 	}
 	data, err := Execute(context.Background(), req, deps)
-	stdout.Write(encodeResponse(newResponse(data, err)))
+	if text, ok := data.(plainTexter); ok && err == nil {
+		io.WriteString(stdout, text.plainText())
+	} else {
+		stdout.Write(encodeResponse(newResponse(data, err)))
+	}
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 	}
 	return exitCode(err)
 }
+
+// plainTexter is implemented by answers that print as text on the command
+// line, such as a drafted recipe; the request file form still gets JSON.
+type plainTexter interface{ plainText() string }
 
 // commandName joins two-word commands such as "advisories check" into the
 // table's "advisories-check".

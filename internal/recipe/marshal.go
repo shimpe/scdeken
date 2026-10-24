@@ -9,11 +9,9 @@ import (
 )
 
 // Marshal writes a recipe in the canonical layout, with the
-// [versions.approved] table last.
+// [versions.approved] table last. It does not validate: a drafted recipe
+// with TODO fields is written as it is, and Parse or Load check it later.
 func Marshal(r Recipe) ([]byte, error) {
-	if err := r.Validate(); err != nil {
-		return nil, err
-	}
 	var b bytes.Buffer
 	fmt.Fprintf(&b, "name = %s\n", strconv.Quote(r.Name))
 	fmt.Fprintf(&b, "summary = %s\n", strconv.Quote(r.Summary))

@@ -21,6 +21,11 @@ type Request struct {
 	IncludeUnreviewed bool            `json:"include_unreviewed,omitempty"`
 	Choices           install.Choices `json:"choices"`
 	Path              string          `json:"path,omitempty"`
+	URL               string          `json:"url,omitempty"`
+	Out               string          `json:"out,omitempty"`
+	Build             bool            `json:"build,omitempty"`
+	SCVersion         string          `json:"sc_version,omitempty"`
+	Commit            string          `json:"commit,omitempty"`
 	AdvisoryID        string          `json:"advisory_id,omitempty"`
 	Offline           bool            `json:"offline,omitempty"`
 	IndexURL          string          `json:"index_url,omitempty"`
