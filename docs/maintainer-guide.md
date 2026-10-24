@@ -34,7 +34,9 @@ This guide explains the ideas and the day-to-day work and links there for the st
 The same `scdeken` program runs on users' computers, in the build workflows and in
 the indexer, so there is one implementation of recipe parsing, platform detection
 and building. The recipes workflows install it with `go install` at the version in
-`.scdeken-version` of the recipes repository.
+`.scdeken-version` of the recipes repository, which is pinned to a reviewed tag or a full
+commit id of this repository and changed only by pull request (it also builds the program
+that signs the index).
 
 ## 2. How a package gets to users
 
@@ -222,9 +224,10 @@ scdeken index keygen --out-dir <secure folder>
 
 This writes `scdeken.pub` (public) and `scdeken.key` (password-protected secret).
 
-1. Store the **secret** key as the secret `SCDEKEN_SIGNING_KEY` and its password as
-   `SCDEKEN_SIGNING_PASSWORD` in a GitHub *environment* called `release` of the recipes
-   repository, restricted to the `main` branch. Only the Index workflow's sign job and the
+1. Create a GitHub *environment* called `release` in the recipes repository and restrict
+   it to the `main` branch **before** adding anything to it. Then store the **secret** key
+   as its secret `SCDEKEN_SIGNING_KEY` and the password as `SCDEKEN_SIGNING_PASSWORD`
+   (keygen asks for the password twice). Only the Index workflow's sign job and the
    Publish workflow's release step use that environment; pull request builds never see it.
 2. Paste the **public** key (the line starting with `RW`) into `EmbeddedPublicKey` in
    `internal/sign/key.go` of the tool repository, commit, and make a release (section 8).
@@ -265,7 +268,8 @@ API (set a token to avoid the anonymous rate limit).
 5. **Merge that pull request.** The quark reads `helper-lock.json`; users who install or
    update the quark download exactly these helpers and the quark refuses any file with a
    different hash. Until it is merged, `main` still pins the previous helper.
-6. In the recipes repository, pin `.scdeken-version` to the new tag (it starts as `main`).
+6. In the recipes repository, pin `.scdeken-version` to the new tag (or a full commit id)
+   with a reviewed pull request. It never names a branch once sc-deken is published.
 
 The quark version in `Deken.quark` is bumped by hand when the sclang side changes.
 
@@ -286,8 +290,8 @@ The sclang unit tests are not part of CI (they need a SuperCollider installation
 | Workflow | When | What |
 |---|---|---|
 | `add-package.yml` | an "Add a package" issue is opened | drafts a recipe with `recipe new` and opens a pull request. |
-| `pr-build.yml` | pull requests | `recipe check` on changed recipes, validates advisories, builds new versions on every platform **without secrets and never from `pull_request_target`**, comments the result per platform. |
-| `publish.yml` | merge to `main` | builds the approved versions, creates releases `<package>-<version>`, refreshes the index. |
+| `pr-build.yml` | pull requests | `recipe check` on changed recipes, validates advisories, builds new versions on every platform **without secrets and never from `pull_request_target`**, comments the result per platform. The fixed-name check `pr-build-result` (the one branch protection requires) fails only for recipe or advisory problems. |
+| `publish.yml` | merge to `main`, or by hand (recipe, version) | builds the approved versions; a failed platform is left out and the others are released as `<package>-<version>`; refreshes the index. Only artifacts of planned legs whose job succeeded, holding exactly their zip and file list, are published. |
 | `index.yml` | nightly, on merge, manual | builds the index, signs it in a separate job (the only job with the key), deploys to GitHub Pages; the tag bot opens version PRs and moved-tag issues. |
 
 ## 10. Trust model in one page
@@ -300,7 +304,14 @@ The sclang unit tests are not part of CI (they need a SuperCollider installation
   the repository and commit.
 - Recipes are data; they cannot run code by being read.
 - The signing key only exists in the `release` environment, restricted to `main`, and
-  `main` needs reviewed pull requests with no bypass for bots.
+  `main` needs reviewed pull requests with no bypass for bots. (With a single maintainer,
+  required Code Owner review blocks the owner's own pull requests; the recipes README
+  explains the two ways out.)
+- A Publish build leg runs the package's own build with the run's artifact token, so it
+  could upload an artifact under another leg's name. The release job publishes only
+  artifacts named after a planned leg whose job succeeded and holding exactly that leg's
+  zip and file list. A leg could still ship a bad build of its own package and platform,
+  which is why the code at the pinned commit is reviewed.
 - Withdrawing is fast (a reviewed pull request to `advisories/`), and removal on users'
   computers always needs their permission and goes to quarantine.
 
