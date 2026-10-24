@@ -102,3 +102,38 @@ func TestFakeLookupOrder(t *testing.T) {
 		t.Errorf("recorded %d calls, want 4", len(f.Calls))
 	}
 }
+
+func TestWithoutPromptsKeepsTheEnvironmentAndSilencesGit(t *testing.T) {
+	t.Setenv("SCDEKEN_TEST_MARKER", "kept")
+	c := WithoutPrompts(Cmd{Name: "git"})
+	env := strings.Join(c.Env, "\n")
+	for _, want := range []string{"SCDEKEN_TEST_MARKER=kept", "GIT_TERMINAL_PROMPT=0", "GCM_INTERACTIVE=never"} {
+		if !strings.Contains(env, want) {
+			t.Errorf("env lacks %s", want)
+		}
+	}
+	given := WithoutPrompts(Cmd{Name: "git", Env: []string{"A=1"}})
+	if len(given.Env) != 3 || given.Env[0] != "A=1" {
+		t.Errorf("a given environment is extended, not replaced: %q", given.Env)
+	}
+}
+
+func TestNoPromptWrapsEveryCall(t *testing.T) {
+	f := &Fake{Script: map[string]FakeResult{"*": {}}}
+	r := NoPrompt{Runner: f}
+	r.Run(context.Background(), Cmd{Name: "git", Args: []string{"fetch"}})
+	r.Output(context.Background(), Cmd{Name: "git", Args: []string{"ls-remote"}})
+	for _, c := range f.Calls {
+		if !strings.Contains(strings.Join(c.Env, " "), "GIT_TERMINAL_PROMPT=0") {
+			t.Errorf("%v ran with prompts on", c.Args)
+		}
+	}
+}
+
+// A child that leaves a grandchild holding its output open must not block
+// Wait forever.
+func TestCommandsGiveUpWaitingForOutput(t *testing.T) {
+	if got := command(context.Background(), Cmd{Name: "git"}).WaitDelay; got != waitDelay || got == 0 {
+		t.Errorf("WaitDelay = %v", got)
+	}
+}

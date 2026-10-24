@@ -70,7 +70,8 @@ func Run(ctx context.Context, r run.Runner, o Options) (Result, error) {
 
 func (o Options) srcDir() string { return filepath.Join(o.WorkDir, "src") }
 
-// fetchSource downloads exactly the pinned commit into <WorkDir>/src.
+// fetchSource downloads exactly the pinned commit into <WorkDir>/src. git
+// never asks for a password: a repository that went private just fails.
 func (o Options) fetchSource(ctx context.Context, r run.Runner) error {
 	src := o.srcDir()
 	steps := [][]string{
@@ -83,7 +84,7 @@ func (o Options) fetchSource(ctx context.Context, r run.Runner) error {
 		steps = append(steps, []string{"-C", src, "submodule", "update", "--init", "--recursive", "--depth", "1"})
 	}
 	for _, args := range steps {
-		if err := r.Run(ctx, run.Cmd{Name: "git", Args: args, Log: o.Log}); err != nil {
+		if err := r.Run(ctx, run.WithoutPrompts(run.Cmd{Name: "git", Args: args, Log: o.Log})); err != nil {
 			return fmt.Errorf("fetch source %s: %w", o.RepoURL, err)
 		}
 	}

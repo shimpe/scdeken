@@ -10,6 +10,7 @@ import (
 	"io"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 // tailLines is how many trailing output lines go into a failure message.
@@ -76,9 +77,15 @@ func (Exec) Output(ctx context.Context, c Cmd) (string, error) {
 // LookPath implements Runner.
 func (Exec) LookPath(name string) (string, error) { return exec.LookPath(name) }
 
+// waitDelay is how long Wait waits for the output pipes to close after the
+// process has exited or been killed. A grandchild (a git credential helper,
+// a compiler server) that keeps them open must not hang the helper.
+const waitDelay = 10 * time.Second
+
 // command builds the os/exec command for c.
 func command(ctx context.Context, c Cmd) *exec.Cmd {
 	cmd := exec.CommandContext(ctx, c.Name, c.Args...)
+	cmd.WaitDelay = waitDelay
 	cmd.Dir = c.Dir
 	if c.Env != nil {
 		cmd.Env = c.Env

@@ -27,7 +27,7 @@ type GitScanner struct {
 func (g GitScanner) Refs(ctx context.Context, url string) (string, map[string]string, error) {
 	ctx, cancel := g.limit(ctx)
 	defer cancel()
-	return discover.RemoteRefs(ctx, noPrompt{g.Runner}, url)
+	return discover.RemoteRefs(ctx, run.NoPrompt{Runner: g.Runner}, url)
 }
 
 // Scan inspects url at commit; the scratch folder is removed afterwards.
@@ -39,7 +39,7 @@ func (g GitScanner) Scan(ctx context.Context, url, commit string) (discover.Scan
 		return discover.Scan{}, fmt.Errorf("scan %s: %w", url, err)
 	}
 	defer os.RemoveAll(tmp)
-	return discover.ScanRepo(ctx, noPrompt{g.Runner}, url, commit, filepath.Join(tmp, "src"))
+	return discover.ScanRepo(ctx, run.NoPrompt{Runner: g.Runner}, url, commit, filepath.Join(tmp, "src"))
 }
 
 func (g GitScanner) limit(ctx context.Context) (context.Context, context.CancelFunc) {
@@ -47,25 +47,4 @@ func (g GitScanner) limit(ctx context.Context) (context.Context, context.CancelF
 		return context.WithTimeout(ctx, DefaultRepoTimeout)
 	}
 	return context.WithTimeout(ctx, g.Timeout)
-}
-
-// noPrompt runs every process with git's password prompts switched off, so a
-// repository that has become private fails instead of waiting for input.
-type noPrompt struct{ run.Runner }
-
-func (n noPrompt) Run(ctx context.Context, c run.Cmd) error {
-	return n.Runner.Run(ctx, withoutPrompts(c))
-}
-
-func (n noPrompt) Output(ctx context.Context, c run.Cmd) (string, error) {
-	return n.Runner.Output(ctx, withoutPrompts(c))
-}
-
-func withoutPrompts(c run.Cmd) run.Cmd {
-	env := c.Env
-	if env == nil {
-		env = os.Environ()
-	}
-	c.Env = append(append([]string(nil), env...), "GIT_TERMINAL_PROMPT=0", "GCM_INTERACTIVE=never")
-	return c
 }

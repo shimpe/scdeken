@@ -38,11 +38,13 @@ type Headers struct {
 }
 
 // Ensure makes sure the source for sc (or the nearest older release) is in
-// cacheDir and returns where it is. log may be nil.
+// cacheDir and returns where it is. log may be nil. git never asks for a
+// password.
 func Ensure(ctx context.Context, r run.Runner, cacheDir string, sc version.Version, log io.Writer) (Headers, error) {
 	if log == nil {
 		log = io.Discard
 	}
+	r = run.NoPrompt{Runner: r}
 	tags, err := listTags(ctx, r)
 	if err != nil {
 		return Headers{}, err

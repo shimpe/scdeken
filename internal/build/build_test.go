@@ -304,3 +304,16 @@ func TestBuildCopiesLicense(t *testing.T) {
 		t.Errorf("license not copied: %v", err)
 	}
 }
+
+func TestBuildRunsGitWithoutPrompts(t *testing.T) {
+	o := baseOptions(t)
+	f := installFake(t, "Pkg/Pkg.scx")
+	if _, err := Run(context.Background(), f, o); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range f.Calls {
+		if c.Name == "git" && !strings.Contains(strings.Join(c.Env, " "), "GIT_TERMINAL_PROMPT=0") {
+			t.Errorf("git %v may ask for a password", c.Args)
+		}
+	}
+}

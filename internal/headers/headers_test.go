@@ -182,3 +182,16 @@ func TestEnsureMissingSubmodules(t *testing.T) {
 		t.Error("marker written despite missing submodules")
 	}
 }
+
+func TestEnsureRunsGitWithoutPrompts(t *testing.T) {
+	f := newFake()
+	f.OnRun = fakeClone(t, true)
+	if _, err := Ensure(context.Background(), f, t.TempDir(), mustVersion(t, "3.13.0"), nil); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range f.Calls {
+		if !strings.Contains(strings.Join(c.Env, " "), "GCM_INTERACTIVE=never") {
+			t.Errorf("git %v may ask for a password", c.Args)
+		}
+	}
+}
