@@ -32,7 +32,7 @@ var main = {
 	File.mkdir(outDir);
 
 	g = DekenGui.new.front;
-	g.window.bounds = Rect(40, 40, 1060, 660);
+	g.window.bounds = Rect(40, 40, 1320, 660);
 	4.wait;
 	shot.value(g.window, "deken-start");
 
@@ -107,13 +107,13 @@ var main = {
 	shot.value(Window.allWindows.last, "deken-dialog-after-real");
 	Window.allWindows.last.close;
 	g.unreviewedBox.valueAction = true;
-	g.search.string = "sketchy";
+	g.search.string = "shady";
 	g.search.keyUpAction.value;
 	2.wait;
 	g.tree.currentItem = g.tree.itemAt(0);
 	3.wait;
 	shot.value(g.window, "deken-unreviewed");
-	g.perform(\prInstall, "Sketchy", nil);
+	g.perform(\prRun, "Shady", nil, "Installing");
 	4.wait;
 	shot.value(Window.allWindows.last, "deken-dialog-unreviewed");
 	Window.allWindows.last.close;
@@ -123,15 +123,15 @@ var main = {
 
 	// 6. dialogs
 	dep = plan.value("dep-lib", "0.2.0", ["duplicates", "unreviewed"],
-		(duplicates: [Dictionary.newFrom(["path", "C:/Users/me/AppData/Local/SuperCollider/Extensions/DepLib", "matched", "name"])],
+		(repo: "https://github.com/example/dep-lib", duplicates: [Dictionary.newFrom(["path", "C:/Users/me/AppData/Local/SuperCollider/Extensions/DepLib", "matched", "name"])],
 			quark: Dictionary.newFrom(["url", "https://github.com/example/dep-lib", "commit", "fedcba"])));
 	tree = plan.value("fm-thing", "0.1.0", ["unreviewed", "retracted"],
-		(depends: [dep], retraction: Dictionary.newFrom(["id", "SCD-2026-001", "severity", "vulnerable", "summary", "Reads files outside its folder"])));
-	DekenDialogs.confirm(tree, Dictionary.newFrom(["fm-thing", "https://github.com/example/fm-thing"]), { |c| ("confirm answer: " ++ c).postln }).front;
+		(repo: "https://github.com/example/fm-thing", depends: [dep], retraction: Dictionary.newFrom(["id", "SCD-2026-001", "severity", "vulnerable", "summary", "Reads files outside its folder"])));
+	DekenDialogs.confirm(tree, { |c| ("confirm answer: " ++ c).postln }).front;
 	1.5.wait;
 	shot.value(Window.allWindows.last, "deken-dialog-confirm");
 	Window.allWindows.last.close;
-	DekenDialogs.confirm(plan.value("x", "1", ["duplicates"], (duplicates: [Dictionary.newFrom(["path", "C:/old/X", "matched", "name"])])), Dictionary.new, { |c| ("answer: " ++ c).postln });
+	DekenDialogs.confirm(plan.value("x", "1", ["duplicates"], (duplicates: [Dictionary.newFrom(["path", "C:/old/X", "matched", "name"])])), { |c| ("answer: " ++ c).postln });
 	1.5.wait;
 	shot.value(Window.allWindows.last, "deken-dialog-duplicates");
 	Window.allWindows.last.close;

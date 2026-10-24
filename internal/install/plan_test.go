@@ -198,3 +198,19 @@ func TestPlanIsUpdate(t *testing.T) {
 		t.Error("IsUpdate false with the quark installed")
 	}
 }
+
+func TestPlanCarriesRepoForPackageAndDependencies(t *testing.T) {
+	s := newService(t)
+	p := mustPlan(t, s, "A", "")
+	if p.Repo == "" {
+		t.Fatal("plan has no repo")
+	}
+	for _, d := range p.Depends {
+		if d.Repo == "" {
+			t.Errorf("dependency %s has no repo", d.Package)
+		}
+	}
+	if wild := mustPlan(t, s, "Wild", ""); wild.Repo == "" {
+		t.Error("unreviewed plan has no repo")
+	}
+}

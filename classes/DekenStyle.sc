@@ -12,16 +12,16 @@ DekenStyle {
 
 	// "PLUGIN", "QUARK" or "PLUGIN + QUARK".
 	*typeText { |kind|
-		^switch(kind.asString,
+		^switch((kind !? { |k| k.asString }) ? "",
 			"plugin", { "PLUGIN" },
 			"quark", { "QUARK" },
 			"plugin+quark", { "PLUGIN + QUARK" },
-			{ kind.asString.toUpper }
+			{ "" }
 		)
 	}
 
 	*typeColor { |kind|
-		^Color.fromHexString(switch(kind.asString,
+		^Color.fromHexString(switch((kind !? { |k| k.asString }) ? "",
 			"plugin", { "#6a3fb5" },
 			"quark", { "#0f7f86" },
 			"plugin+quark", { "#4d5f9e" },
@@ -31,17 +31,19 @@ DekenStyle {
 
 	// ---- status badge
 
-	// trust: reviewed | community | unreviewed. route: prebuilt | local-build |
+	// trust: reviewed | community | unreviewed; nil or anything else means we do
+	// not know the package, which is just "installed". route: prebuilt | local-build |
 	// quark, or nil while it is not known yet (a list row has no route until
 	// the package is looked at). A withdrawn version beats an update, which
 	// beats the trust level.
 	*badgeText { |trust, route, retracted = false, updateAvailable = false|
 		if(retracted == true) { ^"⛔ retracted" };
 		if(updateAvailable == true) { ^"update available" };
-		^switch(trust.asString,
+		^switch((trust !? { |t| t.asString }) ? "",
+			"reviewed", { this.prReviewedText(route) },
 			"community", { "community-listed" },
 			"unreviewed", { if(route.asString == "quark") { "⚠ unreviewed" } { "⚠ unreviewed · build locally" } },
-			{ this.prReviewedText(route) }
+			{ "installed" }
 		)
 	}
 

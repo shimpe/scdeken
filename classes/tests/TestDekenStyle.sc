@@ -4,6 +4,7 @@ TestDekenStyle : UnitTest {
 		this.assertEquals(DekenStyle.typeText("quark"), "QUARK");
 		this.assertEquals(DekenStyle.typeText("plugin+quark"), "PLUGIN + QUARK");
 		this.assertEquals(DekenStyle.typeText(\quark), "QUARK", "symbols work too");
+		this.assertEquals(DekenStyle.typeText(nil), "", "unknown kind is blank, never NIL");
 	}
 
 	test_typeColors {
@@ -21,6 +22,13 @@ TestDekenStyle : UnitTest {
 		this.assertEquals(DekenStyle.badgeText("community", "prebuilt"), "community-listed");
 		this.assertEquals(DekenStyle.badgeText("reviewed", "quark"), "reviewed");
 		this.assertEquals(DekenStyle.badgeText("reviewed", nil), "reviewed", "route not known yet");
+	}
+
+	test_unknownTrustIsInstalledNotReviewed {
+		this.assertEquals(DekenStyle.badgeText(nil, nil), "installed");
+		this.assertEquals(DekenStyle.badgeText("", "prebuilt"), "installed");
+		this.assertEquals(DekenStyle.badgeText("surprise", nil), "installed");
+		this.assertEquals(DekenStyle.badgeColor("installed"), Color.fromHexString("#eeeeee"));
 	}
 
 	test_badgeStates {

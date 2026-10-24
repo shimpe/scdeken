@@ -3,12 +3,13 @@
 // missing or unreadable, so a damaged file never stops the window opening.
 DekenSettings {
 	classvar values;
+	classvar <>pathOverride;  // tests point this at a temporary file
 
 	*defaults {
 		^(checkAdvisories: true, showUnreviewed: false, helperPath: "")
 	}
 
-	*path { ^Platform.userAppSupportDir +/+ "sc-deken" +/+ "settings.scd" }
+	*path { ^pathOverride ? Platform.userAppSupportDir +/+ "sc-deken" +/+ "settings.scd" }
 
 	// Forgets what was read, so the next get reads the file again.
 	*reload { values = nil }

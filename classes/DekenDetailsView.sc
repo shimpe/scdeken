@@ -43,7 +43,7 @@ DekenDetailsView {
 	// info is the helper's info answer: package and retractions.
 	fill { |info|
 		package = info["package"];
-		byline.string = "% · %".format((package["authors"] ? ["unknown author"]).join(", "), package["license"]);
+		byline.string = DekenDetailsView.bylineText(package);
 		summary.string = package["summary"];
 		inside.string = DekenDetailsView.insideLines(package).join("\n");
 		needs.string = DekenDetailsView.needsText(package);
@@ -96,9 +96,17 @@ DekenDetailsView {
 		var lines = this.pluginLines(pkg["plugin_files"] ? []);
 		var ugens = pkg["ugens"] ? [];
 		var library = (pkg["classes"] ? []).reject { |c| ugens.indexOfEqual(c).notNil };
+		var count = library.size;
 		if(ugens.notEmpty) { lines = lines ++ ["UGen classes: " ++ ugens.size] };
-		lines = lines ++ [if(library.isEmpty) { "sclang library: none" } { "sclang library: % classes".format(library.size) }];
+		lines = lines ++ [if(library.isEmpty) { "sclang library: none" } { "sclang library: % %".format(count, if(count == 1) { "class" } { "classes" }) }];
 		^lines
+	}
+
+	// "shimpe · GPL-3.0"; whatever is missing is left out.
+	*bylineText { |pkg|
+		var authors = pkg["authors"] ? [];
+		var parts = [authors.join(", "), pkg["license"] ? ""].select { |p| p.notEmpty };
+		^parts.join(" · ")
 	}
 
 	// FMX6.scx + FMX6_supernova.scx -> "Server plugin: FMX6 (scsynth + supernova)".

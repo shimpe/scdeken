@@ -15,6 +15,14 @@ TestDekenDetailsView : UnitTest {
 	test_insideLinesForAQuark {
 		var pkg = Dictionary.newFrom(["classes", ["Panola", "PanolaPlayer"]]);
 		this.assertEquals(DekenDetailsView.insideLines(pkg), ["sclang library: 2 classes"]);
+		this.assertEquals(DekenDetailsView.insideLines(Dictionary.newFrom(["classes", ["Panola"]])), ["sclang library: 1 class"]);
+	}
+
+	test_bylineLeavesOutWhatIsMissing {
+		this.assertEquals(DekenDetailsView.bylineText(Dictionary.newFrom(["authors", ["a", "b"], "license", "MIT"])), "a, b · MIT");
+		this.assertEquals(DekenDetailsView.bylineText(Dictionary.newFrom(["license", "MIT"])), "MIT");
+		this.assertEquals(DekenDetailsView.bylineText(Dictionary.newFrom(["authors", ["a"]])), "a");
+		this.assertEquals(DekenDetailsView.bylineText(Dictionary.new), "");
 	}
 
 	test_versionsAndNeeds {

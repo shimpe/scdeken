@@ -30,10 +30,9 @@ DekenDialogs {
 
 	// ---- confirmation
 
-	// Shows everything the plan needs the user to agree to. repos maps a
-	// package name to its repository address (the plan itself carries only the
-	// commit). action gets the choices Event, or nil when the user cancels.
-	*confirm { |plan, repos, action|
+	// Shows everything the plan needs the user to agree to. action gets the
+	// choices Event, or nil when the user cancels.
+	*confirm { |plan, action|
 		var plans = this.confirmPlans(plan);
 		var kinds = this.confirmKinds(plans);
 		var w = this.prWindow("Please confirm", 560, (230 + (plans.size * 110)).min(640));
@@ -41,7 +40,7 @@ DekenDialogs {
 		var answered = false;
 		var finish = { |choices| answered = true; w.close; action.value(choices) };
 		var cancel = Button().states_([["Cancel"]]).action_({ finish.value(nil) });
-		var canvas = View().layout_(VLayout(*(plans.collect { |p| this.prPlanSection(p, repos) } ++ [nil])));
+		var canvas = View().layout_(VLayout(*(plans.collect { |p| this.prPlanSection(p) } ++ [nil])));
 		var yes = this.prConfirmButtons(kinds, duplicate, finish);
 		var askDuplicate = kinds.indexOfEqual("duplicates").notNil and: { kinds.size > 1 };
 		w.layout = VLayout(
@@ -66,11 +65,11 @@ DekenDialogs {
 		^[yes.value("Replace (old copy goes to a backup)", "replace"), yes.value("Keep existing", "keep")]
 	}
 
-	*prPlanSection { |plan, repos|
+	*prPlanSection { |plan|
 		var items = [this.prLabel("%  %".format(plan["package"], plan["version"]), true)];
 		(plan["confirm"] ? []).do { |kind|
 			items = items ++ switch(kind,
-				"unreviewed", { [this.prUnreviewedText(plan, repos)] },
+				"unreviewed", { [this.prLabel(this.unreviewedText(plan))] },
 				"retracted", { this.prRetractedViews(plan) },
 				"duplicates", { this.prDuplicateViews(plan) },
 				{ [] }
@@ -79,11 +78,11 @@ DekenDialogs {
 		^View().layout_(VLayout(*items).margins_(6)).background_(Color.grey(0.94))
 	}
 
-	*prUnreviewedText { |plan, repos|
-		var quarkURL = plan["quark"] !? { |q| q["url"] };
-		var repo = (repos !? { |r| r[plan["package"]] }) ? quarkURL ? "its repository";
-		^this.prLabel("Nobody has reviewed this package. It will be taken from % at commit % and run on your computer. Only go on if you trust its author.".format(
-			repo, plan["commit"].asString.keep(10)))
+	// Names the repository and commit the package will be taken from.
+	*unreviewedText { |plan|
+		var repo = plan["repo"] ? "its repository";
+		^"Nobody has reviewed this package. It will be taken from % at commit % and run on your computer. Only go on if you trust its author.".format(
+			repo, plan["commit"].asString.keep(10))
 	}
 
 	*prRetractedViews { |plan|

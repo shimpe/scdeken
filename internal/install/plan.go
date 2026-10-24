@@ -64,6 +64,7 @@ type Plan struct {
 	Package      string             `json:"package"`
 	Version      string             `json:"version"`
 	Commit       string             `json:"commit"`
+	Repo         string             `json:"repo"` // the package's repository address
 	Kind         recipe.Kind        `json:"kind"`
 	Trust        index.Trust        `json:"trust"`
 	Route        Route              `json:"route"`
@@ -120,7 +121,7 @@ func (s *Service) lookup(name, version string) (*index.Package, *index.Release, 
 // planOne plans a single package, leaving out Depends and IsUpdate.
 func (s *Service) planOne(ctx context.Context, pkg *index.Package, rel *index.Release) (Plan, error) {
 	p := Plan{
-		Package: pkg.Name, Version: rel.Version, Commit: rel.Commit,
+		Package: pkg.Name, Version: rel.Version, Commit: rel.Commit, Repo: pkg.Repo,
 		Kind: pkg.Kind, Trust: pkg.Trust,
 		AfterInstall: afterInstall(pkg.Kind),
 	}

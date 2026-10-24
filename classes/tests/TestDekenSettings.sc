@@ -1,6 +1,13 @@
 TestDekenSettings : UnitTest {
-	setUp { this.tearDown }
-	tearDown { if(File.exists(DekenSettings.path)) { File.delete(DekenSettings.path) }; DekenSettings.reload }
+	setUp {
+		DekenSettings.pathOverride = Platform.defaultTempDir +/+ "deken-settings-test" ++ UniqueID.next ++ ".scd";
+		DekenSettings.reload
+	}
+	tearDown {
+		if(File.exists(DekenSettings.path)) { File.delete(DekenSettings.path) };
+		DekenSettings.pathOverride = nil;
+		DekenSettings.reload
+	}
 
 	test_defaults {
 		this.assertEquals(DekenSettings.get(\checkAdvisories), true, "advisory check is on by default");

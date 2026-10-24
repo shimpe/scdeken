@@ -9,14 +9,14 @@
 // does not freeze the window.
 DekenGui {
 	classvar kinds;           // filter chips: label and the helper's kind
-	classvar <columnWidths;   // type, name, status, matched; the summary gets the rest
+	classvar <columnWidths;   // type, name, status; the summary gets the rest
 	var <window, <sidebar, stack, <details, <search, <kindButtons, <unreviewedBox, <tree, logView, statusLabel, activity;
 	var <rows, items, generation = 0, searchToken = 0, kind, page = 0, selectedName, selectedRow;
 	var <installed, catalog, busy, log;
 
 	*initClass {
 		kinds = [["All", nil], ["Plugins", "plugin"], ["Quarks", "quark"], ["Plugin + Quark", "plugin+quark"]];
-		columnWidths = [118, 130, 185, 170];
+		columnWidths = [112, 130, 165];
 	}
 
 	*new { ^super.new.init }
@@ -89,7 +89,7 @@ DekenGui {
 
 	prBuildWindow {
 		var screen = Window.screenBounds;
-		window = Window("Packages", Rect((screen.width - 1200) / 2, (screen.height - 660) / 2, 1200, 660));
+		window = Window("Packages", Rect((screen.width - 1320) / 2, (screen.height - 660) / 2, 1320, 660));
 		details = DekenDetailsView((
 			install: { |name, version| this.prInstall(name, version) },
 			update: { |name| this.prRun(name, nil, "Updating") },
@@ -117,7 +117,7 @@ DekenGui {
 			Button().states_([[pair[0], Color.black, Color.grey(0.93)], [pair[0], Color.black, Color.new255(207, 220, 247)]])
 				.value_(if(i == 0) { 1 } { 0 }).maxHeight_(24).action_({ this.prPickKind(i) })
 		};
-		tree = TreeView().columns_(["Type", "Name", "Summary", "Status", "Matched"]).minWidth_(480);
+		tree = TreeView().columns_(["Type", "Name", "Summary", "Status"]).minWidth_(480);
 		tree.onItemChanged = { this.prSelect };
 		tree.setProperty(\indentation, 0);
 		^View().layout_(VLayout(
@@ -149,7 +149,7 @@ DekenGui {
 	// Summary column takes what is left.
 	prFitColumns {
 		var rest = (tree.bounds.width - columnWidths.sum - 24).max(120).asInteger;
-		[columnWidths[0], columnWidths[1], rest, columnWidths[2], columnWidths[3]].do { |w, i| tree.setColumnWidth(i, w) }
+		[columnWidths[0], columnWidths[1], rest, columnWidths[2]].do { |w, i| tree.setColumnWidth(i, w) }
 	}
 
 	// ---- pages, search, filters
@@ -173,7 +173,7 @@ DekenGui {
 	}
 
 	prRefreshList {
-		if(page == 0) { this.prSearch } { this.prShowRows(this.prInstalledRows(page == 2)) }
+		if(page == 0) { this.prSearch } { this.prShowRows(DekenRows.installedRows(installed, catalog, page == 2, kind, search.string)) }
 	}
 
 	prSearch { |next|
@@ -181,38 +181,12 @@ DekenGui {
 		Deken.search(search.string, kind, unreviewedBox.value, { |r|
 			{
 				if(token == searchToken) {
-					if(r.ok) { this.prShowRows(r.data.collect { |hit| this.prRowFromHit(hit) }) } { activity.string = r.error }
+					if(r.ok) { this.prShowRows(r.data.collect { |hit| DekenRows.fromHit(hit, installed[hit["name"].toLower]) }) } { activity.string = r.error }
 				};
 				next.value
 			}.defer
 		})
 	}
-
-	prRowFromHit { |hit|
-		var have = installed[hit["name"].toLower];
-		^(name: hit["name"], kind: hit["kind"], summary: hit["summary"], trust: hit["trust"], latest: hit["latest"],
-			retracted: hit["retracted"], match: hit["match"],
-			installed: have !? { |i| i["version"] }, update: have.notNil and: { have["update_available"] == true })
-	}
-
-	prInstalledRows { |onlyUpdates|
-		var words = search.string.toLower;
-		var list = installed.values.select { |i| onlyUpdates.not or: { i["update_available"] == true } };
-		var wanted = { |r| kind.isNil or: { r[\kind] == kind } };
-		list = list.sort { |a, b| a["name"].toLower < b["name"].toLower };
-		list = list.collect { |i| this.prRowFromInstalled(i) };
-		^list.select { |r| wanted.value(r) and: { words.isEmpty or: { (r[\name] ++ " " ++ r[\summary]).toLower.find(words).notNil } } }
-	}
-
-	prRowFromInstalled { |item|
-		var known = catalog[item["name"].toLower];
-		^(name: item["name"], kind: item["kind"] ?? { this.prKnown(known, "kind") }, summary: this.prKnown(known, "summary") ? "",
-			trust: item["trust"] ?? { this.prKnown(known, "trust") }, latest: item["latest"], retracted: item["advisory"].notNil,
-			installed: item["version"], update: item["update_available"] == true)
-	}
-
-	// A field of the package list entry, or nil when the package is not in the list.
-	prKnown { |entry, field| ^entry !? { |e| e[field] } }
 
 	// ---- the list
 
@@ -233,7 +207,7 @@ DekenGui {
 
 	prAddItem { |row|
 		var text = this.prStatusOf(row);
-		var item = tree.addItem([DekenStyle.typeText(row[\kind]), row[\name], row[\summary] ? "", text, DekenStyle.matchedText(row[\match])]);
+		var item = tree.addItem([DekenStyle.typeText(row[\kind]), row[\name], DekenRows.summaryCell(row), text]);
 		item.setColor(0, DekenStyle.typeColor(row[\kind]));
 		item.setTextColor(0, DekenStyle.chipText);
 		this.prColorStatus(item, text);
@@ -245,12 +219,7 @@ DekenGui {
 		item.setTextColor(3, DekenStyle.badgeTextColor(text));
 	}
 
-	prStatusOf { |row|
-		var plain = row[\trust].asString.isEmpty and: { row[\update] != true } and: { row[\retracted] != true };
-		if(busy.includes(row[\name].toLower)) { ^"working…" };
-		if(row[\installed].notNil and: { plain }) { ^"installed" };
-		^DekenStyle.badgeText(row[\trust], row[\route], row[\retracted], row[\update])
-	}
+	prStatusOf { |row| ^DekenRows.status(row, busy.includes(row[\name].toLower)) }
 
 	// Rewrites the status cell of every row of this package.
 	prRefreshStatus { |name|
@@ -337,9 +306,7 @@ DekenGui {
 	}
 
 	prConfirm { |name, version, r|
-		var repos = Dictionary.new;
-		selectedRow !? { |row| repos[row[\name]] = row[\repo] };
-		DekenDialogs.confirm(r.data, repos, { |choices|
+		DekenDialogs.confirm(r.data, { |choices|
 			if(choices.isNil) {
 				this.prSetBusy(name, false, nil);
 				log.add("Cancelled: nothing was installed.")

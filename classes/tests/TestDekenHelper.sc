@@ -89,6 +89,14 @@ TestDekenHelper : UnitTest {
 		this.assertEquals(quarkCalls.size, 0, "nothing installed yet");
 	}
 
+	test_unreviewedPluginPlanNamesItsRepo {
+		var r = this.await("plan", { |a| Deken.plan("Shady", nil, a) });
+		this.assert(r.ok, "plan works: " ++ r[\error]);
+		this.assertEquals(r.data["repo"], "https://github.com/example/shady");
+		this.assertEquals(r.data["quark"], nil, "a plugin has no quark part");
+		this.assert(DekenDialogs.unreviewedText(r.data).find("https://github.com/example/shady").notNil, "the dialog text names the repo");
+	}
+
 	test_installConfirmedWithoutAnswerStillAsks {
 		var r = this.await("install", { |a| Deken.installConfirmed("Sketchy", nil, (), a) });
 		this.assertEquals(r.ok, false);
