@@ -19,6 +19,7 @@ import (
 type Scan struct {
 	Classes, UGens    []string
 	HasQuark          bool
+	QuarkError        string // why the .quark file could not be read; empty if fine
 	Quark             QuarkFile
 	CMakeDir          string // "" none, "." root, or the subdirectory holding CMakeLists.txt
 	SCPathVar         string
@@ -117,11 +118,13 @@ func scanQuark(dir string, s *Scan) error {
 	if err != nil {
 		return err
 	}
+	s.HasQuark = true
 	q, err := ParseQuarkFile(string(src))
 	if err != nil {
-		return fmt.Errorf("%s: %w", filepath.Base(matches[0]), err)
+		s.QuarkError = fmt.Sprintf("%s: %v", filepath.Base(matches[0]), err)
+		return nil
 	}
-	s.HasQuark, s.Quark = true, q
+	s.Quark = q
 	return nil
 }
 

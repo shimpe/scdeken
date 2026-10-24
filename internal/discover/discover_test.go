@@ -188,3 +188,17 @@ func TestScanLicense(t *testing.T) {
 		t.Fatalf("COPYING not read: %q", s.LicenseFile)
 	}
 }
+
+func TestScanMalformedQuarkKeepsFindings(t *testing.T) {
+	s, _ := scan(t, map[string]string{
+		"Bad.quark":      "{ not a quark",
+		"CMakeLists.txt": "include(${SC_PATH})",
+		"Foo.sc":         "Foo : UGen {}",
+	})
+	if s.Kind != recipe.KindPluginQuark || !s.HasQuark || s.Quark.Name != "" || s.QuarkError == "" {
+		t.Fatalf("scan = %+v", s)
+	}
+	if !reflect.DeepEqual(s.UGens, []string{"Foo"}) {
+		t.Fatalf("ugens = %v", s.UGens)
+	}
+}
