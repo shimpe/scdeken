@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/shimpe/scdeken/internal/recipe"
 	"github.com/shimpe/scdeken/internal/version"
 )
 
@@ -17,7 +18,8 @@ type Dependency struct {
 // ParseDependency reads one dependency string: "Name", "Name@refspec", a
 // repository address ("https://github.com/owner/Repo", "git://...",
 // ".../Repo.git") or an address followed by "@refspec". ok is false for
-// anything that is none of these.
+// anything that is none of these, and for an address that is not a plain
+// https (or git) address of letters, digits and . _ ~ - / (recipe.SafeRepoURL).
 func ParseDependency(raw string) (dep Dependency, ok bool) {
 	raw = strings.TrimSpace(raw)
 	spec, refspec := splitRefspec(raw)
@@ -27,6 +29,9 @@ func ParseDependency(raw string) (dep Dependency, ok bool) {
 		dep = Dependency{Name: spec, Refspec: refspec}
 	}
 	if !plainName.MatchString(dep.Name) {
+		return Dependency{}, false
+	}
+	if dep.URL != "" && !recipe.SafeRepoURL(dep.Key()) {
 		return Dependency{}, false
 	}
 	return dep, true

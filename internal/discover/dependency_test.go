@@ -88,3 +88,26 @@ func TestParseQuarkFileDependencyForms(t *testing.T) {
 		t.Errorf("Notes = %q, want 3 skipped entries", q.Notes)
 	}
 }
+
+func TestParseDependencyRejectsUnsafeAddresses(t *testing.T) {
+	for _, raw := range []string{
+		"http://github.com/o/Repo", "ssh://github.com/o/Repo", "file:///etc/passwd", "https://user@github.com/o/Repo",
+		"https://github.com/o/Repo?x=1", "https://github.com/o/Repo;calc", "https://github.com/o/Re&po",
+		"https://github.com/o/$HOME", "https://github.com:22/o/Repo", "https://github.com/o/Repo%20x",
+		"git://github.com/o/Re`po`",
+	} {
+		if d, ok := ParseDependency(raw); ok {
+			t.Errorf("ParseDependency(%q) = %+v, want rejection", raw, d)
+		}
+	}
+}
+
+func TestUnsafeAddressInQuarkFileIsSkippedWithNote(t *testing.T) {
+	q, err := ParseQuarkFile(`( dependencies: ["https://github.com/o/Repo;rm -rf", "Fine"] )`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(q.Dependencies) != 1 || q.Dependencies[0].Name != "Fine" || len(q.Notes) != 1 {
+		t.Errorf("deps = %+v, notes = %q", q.Dependencies, q.Notes)
+	}
+}

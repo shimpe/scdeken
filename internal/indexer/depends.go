@@ -43,7 +43,8 @@ func rawDependencies(deps []discover.Dependency) []string {
 // keys are rewritten to the spelling of the package they match; address
 // keys are replaced by the name of the package with that repository. A name
 // nobody has stays as it is (planning reports it); an address nobody has
-// moves to DependsUnresolved.
+// moves to DependsUnresolved. A dependency that
+// turns out to be the package itself is dropped.
 func resolveDepends(pkgs []index.Package) {
 	byName, byRepo := map[string]string{}, map[string]string{}
 	for _, p := range pkgs {
@@ -78,6 +79,9 @@ func canonical(byName map[string]string, name string) string {
 // addDepend records a constraint on dependency name; when the package also
 // reached it by another key, both constraints must hold.
 func addDepend(p *index.Package, name, constraint string) {
+	if strings.EqualFold(name, p.Name) {
+		return // a package does not depend on itself
+	}
 	if p.Depends == nil {
 		p.Depends = map[string]string{}
 	}

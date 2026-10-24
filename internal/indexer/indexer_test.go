@@ -239,7 +239,7 @@ func TestBuildSkipsArchivedUnlessReviewed(t *testing.T) {
 
 func previousWith(url string) *index.Index {
 	return &index.Index{Schema: 1, Packages: []index.Package{{
-		Name: "Q", Repo: url, Kind: recipe.KindPlugin, Trust: index.Community, ScannedCommit: sha9,
+		Name: "Q", Repo: url, Kind: recipe.KindPlugin, Trust: index.Community, ScannedCommit: sha9, ScanFormat: index.ScanFormat,
 		Summary: "stale summary", License: "STALE", QuarkSummary: "quark summary", LicenseFile: "MIT", Classes: []string{"Cached"}, UGens: []string{"CachedUGen"},
 		Build:    &recipe.Build{System: "cmake", SCPathVar: "SC_PATH"},
 		Versions: []index.Release{{Version: "9.9.9", Commit: sha0, Builds: []index.Build{{Platform: "linux-x86_64-api3", SHA256: "evil"}}}},
@@ -406,7 +406,7 @@ func TestBuildPreviousDoesNotFreezeMetadata(t *testing.T) {
 func TestBuildReviewedKeepsRecipeValuesOverPrevious(t *testing.T) {
 	r := fmxRecipe()
 	prev := &index.Index{Schema: 1, Packages: []index.Package{{
-		Name: "fmx6", Repo: fmxURL, Kind: recipe.KindQuark, Trust: index.Community, Summary: "old", ScannedCommit: sha1,
+		Name: "fmx6", Repo: fmxURL, Kind: recipe.KindQuark, Trust: index.Community, Summary: "old", ScannedCommit: sha1, ScanFormat: index.ScanFormat,
 		Classes: []string{"Cached"}, Build: &recipe.Build{System: "cmake", Subdir: "evil"},
 	}}}
 	ix := build(t, &fakeScanner{}, Inputs{Recipes: []recipe.Recipe{r}, Previous: prev})
@@ -506,5 +506,34 @@ func TestBuildCachedScanKeepsDependencies(t *testing.T) {
 	if !reflect.DeepEqual(p.Depends, map[string]string{"Other": "=1.0"}) ||
 		!reflect.DeepEqual(p.DependsUnresolved, map[string]string{"https://example.org/z/Zed": "*"}) {
 		t.Errorf("depends = %v, unresolved = %v", p.Depends, p.DependsUnresolved)
+	}
+}
+
+func TestBuildRescansWhenPreviousScanFormatIsOlder(t *testing.T) {
+	url := "https://github.com/a/q"
+	prev := previousWith(url)
+	prev.Packages[0].ScanFormat = 0 // written before dependencies were recorded
+	s := &fakeScanner{refs: map[string]fakeRefs{url: {head: sha9}}, scans: map[string]discover.Scan{url: quarkScan(discover.Dependency{Name: "Other"})}}
+	ix := build(t, s, Inputs{Directory: []discover.Entry{{Name: "Q", URL: url}}, Previous: prev})
+	if len(s.scanned) != 1 {
+		t.Fatalf("scanned %v, want a rescan", s.scanned)
+	}
+	p := pkgNamed(t, ix, "Q")
+	if p.ScanFormat != index.ScanFormat || p.Depends["Other"] != "*" {
+		t.Errorf("package = %+v", p)
+	}
+}
+
+func TestBuildDropsSelfDependency(t *testing.T) {
+	const url = "https://github.com/a/alpha"
+	s := &fakeScanner{refs: map[string]fakeRefs{url: {head: sha9}}, scans: map[string]discover.Scan{url: quarkScan(
+		discover.Dependency{Name: "ALPHA"},
+		discover.Dependency{Name: "alpha", URL: "https://github.com/A/Alpha.git"},
+		discover.Dependency{Name: "Other"},
+	)}}
+	ix := build(t, s, Inputs{Directory: []discover.Entry{{Name: "Alpha", URL: url}}})
+	alpha := pkgNamed(t, ix, "Alpha")
+	if !reflect.DeepEqual(alpha.Depends, map[string]string{"Other": "*"}) || alpha.DependsUnresolved != nil {
+		t.Errorf("depends = %v, unresolved = %v", alpha.Depends, alpha.DependsUnresolved)
 	}
 }

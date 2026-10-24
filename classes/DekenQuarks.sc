@@ -23,15 +23,19 @@
 // it (what installQuark does apart from the dependency loop), and leaves the
 // dependencies to the plan.
 DekenQuarks {
-	classvar override;
+	classvar override, fileURLsAllowed = false;
 
 	*override_ { |events| override = events }
+
+	// Tests only: also accept file:/// addresses (a local git repository).
+	*allowFileURLs_ { |flag| fileURLsAllowed = flag }
 
 	// Installs the quark at url, pinned to commit (nil or "" = default branch).
 	*install { |url, commit|
 		var refspec = if(commit.isNil or: { commit.isEmpty }) { nil } { commit };
 		var quark;
 		if(override.notNil) { ^this.prExpect(override[\install].value(url, refspec), "install " ++ url) };
+		this.prCheckSafe(url, refspec);
 		quark = this.prInstallOnly(url, refspec);
 		if(quark.isNil or: { Quarks.pathIsInstalled(quark.localPath).not }) {
 			Error("the quark at % could not be installed (see the messages above)".format(url)).throw
@@ -83,11 +87,33 @@ DekenQuarks {
 			if(url.isNil) { Error("the quark % is not installed".format(name)).throw };
 			^this.install(url, commit)
 		};
+		this.prCheckSafe(nil, commit);
 		quark.git.fetch;
 		quark.refspec = commit;
 		quark.checkout;
 		this.prVerifyCommit(quark, commit);
 		^quark
+	}
+
+	// SuperCollider's Git builds a shell command from the address and the
+	// refspec without quoting them, so nothing else than a plain https address
+	// (letters, digits and . _ ~ - / only) and a full 40-digit commit id is
+	// ever handed to it. url or commit may be nil to skip that check; a
+	// missing or empty commit means the default branch.
+	*prCheckSafe { |url, commit|
+		if(url.notNil and: { this.prSafeURL(url).not }) {
+			Error("the quark address % is not a plain https://host/path address, so it is not installed".format(url)).throw
+		};
+		if(commit.notNil and: { commit.notEmpty and: { "^[0-9a-fA-F]{40}$".matchRegexp(commit).not } }) {
+			Error("the commit % is not a 40-digit commit id, so it is not used".format(commit)).throw
+		}
+	}
+
+	*prSafeURL { |url|
+		var s = url.asString;
+		var plain = "^https://[A-Za-z0-9._~-]+(/[A-Za-z0-9._~-]+)*/?$".matchRegexp(s)
+			and: { s.split($/).any { |part| part == "." or: { part == ".." } }.not };
+		^plain or: { fileURLsAllowed and: { s.beginsWith("file:///") and: { s.findRegexp("[\"'&|<>^%;$` \t]").isEmpty } } }
 	}
 
 	*prExpect { |result, what|

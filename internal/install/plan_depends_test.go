@@ -1,6 +1,7 @@
 package install
 
 import (
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -181,5 +182,29 @@ func TestPlanConflictMessageNamesBothDependents(t *testing.T) {
 	)
 	if err := planErr(t, s, "App", ""); !strings.Contains(err.Error(), "no version satisfies both") {
 		t.Errorf("err = %v", err)
+	}
+}
+
+func unresolvedApp() index.Package {
+	app := quarkWith("App", nil, "1.0.0")
+	app.DependsUnresolved = map[string]string{"https://example.org/x/Elsewhere": "*"}
+	return app
+}
+
+func TestPlanUnresolvedURLMalwareIsBlocked(t *testing.T) {
+	s := depsService(t, unresolvedApp())
+	s.Index.Advisories = []advisory.Advisory{{ID: "SCD-7", Repo: "https://example.org/x/elsewhere.git", Versions: []string{"*"}, Severity: advisory.Malware, Summary: "steals files"}}
+	err := planErr(t, s, "App", "")
+	if !errors.Is(err, ErrBlocked) {
+		t.Errorf("err = %v, want a blocked error", err)
+	}
+}
+
+func TestPlanUnresolvedURLBrokenNeedsConfirmation(t *testing.T) {
+	s := depsService(t, unresolvedApp())
+	s.Index.Advisories = []advisory.Advisory{{ID: "SCD-8", Repo: "https://example.org/x/Elsewhere", Versions: []string{"*"}, Severity: advisory.Broken, Summary: "crashes"}}
+	d := mustPlan(t, s, "App", "").Depends[0]
+	if !reflect.DeepEqual(d.Confirm, []string{ConfirmUnreviewed, ConfirmRetracted}) || d.Retraction == nil || d.Retraction.ID != "SCD-8" {
+		t.Errorf("confirm = %v, retraction = %+v", d.Confirm, d.Retraction)
 	}
 }

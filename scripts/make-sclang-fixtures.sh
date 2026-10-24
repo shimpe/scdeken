@@ -17,6 +17,8 @@ native() { if command -v cygpath >/dev/null; then cygpath -m "$1"; else echo "$1
 fileurl() { local p; p="$(native "$1")"; case "$p" in /*) echo "file://$p" ;; *) echo "file:///$p" ;; esac; }
 
 command -v go >/dev/null || export PATH="/c/Scripts/Temp/claude/go-dl/x/go/bin:$PATH"
+# Go builds and links in GOTMPDIR; follow TMPDIR so executables land where the caller wants them.
+[ -n "${TMPDIR:-}" ] && export GOTMPDIR="${GOTMPDIR:-$TMPDIR}"
 case "$(uname -s)" in
 	MINGW*|MSYS*|CYGWIN*) os=windows; ext=.exe ;;
 	Darwin) os=macos; ext= ;;

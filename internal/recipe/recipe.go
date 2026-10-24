@@ -248,8 +248,8 @@ func (r Recipe) validateDepends() error {
 		if !namePattern.MatchString(key) && !IsDependencyURL(key) {
 			return fmt.Errorf("dependency %q must be a package name or an https:// repository address", key)
 		}
-		if key == "https://" {
-			return fmt.Errorf("dependency %q has no repository address", key)
+		if IsDependencyURL(key) && !SafeRepoURL(key) {
+			return fmt.Errorf("dependency %q is not a plain https://host/path repository address (letters, digits and . _ ~ - only)", key)
 		}
 		if _, err := version.ParseConstraint(constraint); err != nil {
 			return fmt.Errorf("dependency %s: %w", key, err)

@@ -37,6 +37,12 @@ type Index struct {
 	NextPublicKeys []string             `json:"next_public_keys,omitempty"`
 }
 
+// ScanFormat numbers the set of scan results a package carries (classes,
+// UGens, quark name and summary, dependencies, ...). The indexer reuses an
+// earlier scan only when it was written in the current format, so a new
+// kind of finding is never silently missing from reused entries.
+const ScanFormat = 2
+
 // Package is one installable plugin or quark.
 type Package struct {
 	Name              string                        `json:"name"`
@@ -49,6 +55,7 @@ type Package struct {
 	Stars             int                           `json:"stars"`
 	Pushed            time.Time                     `json:"pushed"`
 	ScannedCommit     string                        `json:"scanned_commit"`
+	ScanFormat        int                           `json:"scan_format"` // format of the scan results, see ScanFormat
 	Classes           []string                      `json:"classes,omitempty"`
 	UGens             []string                      `json:"ugens,omitempty"`
 	QuarkName         string                        `json:"quark_name,omitempty"`    // scan result: name in the .quark file

@@ -86,6 +86,7 @@ func Build(ctx context.Context, s Scanner, in Inputs) (*index.Index, error) {
 		if !ok {
 			continue
 		}
+		pkg.ScanFormat = index.ScanFormat
 		key := strings.ToLower(pkg.Name)
 		if b.names[key] {
 			b.logf("skipping %s: the name %q is already used by another package", c.url, pkg.Name)

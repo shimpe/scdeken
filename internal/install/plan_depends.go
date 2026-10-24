@@ -226,7 +226,7 @@ func (g *depGraph) plans(ctx context.Context, root *depNode, live map[*depNode]b
 
 func (g *depGraph) planNode(ctx context.Context, n *depNode, ns []need) (Plan, error) {
 	if n.pkg == nil {
-		return headPlan(n.url), nil
+		return g.s.headPlan(n.url)
 	}
 	rel, err := g.s.chooseRelease(n.pkg, ns)
 	if err != nil {
@@ -241,15 +241,21 @@ func (g *depGraph) planNode(ctx context.Context, n *depNode, ns []need) (Plan, e
 }
 
 // headPlan installs the newest commit of a quark that the package list does
-// not know. It is unreviewed, so the user is asked before it is installed.
-func headPlan(url string) Plan {
-	return Plan{
+// not know. It is unreviewed, so the user is asked before it is installed;
+// advisories that name its repository still apply.
+func (s *Service) headPlan(url string) (Plan, error) {
+	p := Plan{
 		Package: repoBaseName(url), Version: headVersion, Repo: url,
 		Kind: recipe.KindQuark, Trust: index.Unreviewed, Route: RouteQuark,
 		Quark:        &QuarkRef{URL: url},
 		Confirm:      []string{ConfirmUnreviewed},
 		AfterInstall: afterInstall(recipe.KindQuark),
 	}
+	stub := &index.Package{Name: p.Package, Repo: url, Kind: p.Kind, Trust: p.Trust}
+	if err := s.applyRetraction(&p, stub, &index.Release{Version: headVersion, Unstable: true}); err != nil {
+		return Plan{}, err
+	}
+	return p, nil
 }
 
 // repoBaseName is the last part of a repository address, without ".git".

@@ -160,7 +160,7 @@ func (b *builder) cached(url, commit string, reviewed bool) (scanInfo, bool) {
 		return scanInfo{}, false
 	}
 	prev, ok := b.in.Previous.FindRepo(url)
-	if !ok || prev.ScannedCommit != commit || (!reviewed && prev.Trust == index.Reviewed) {
+	if !ok || prev.ScanFormat != index.ScanFormat || prev.ScannedCommit != commit || (!reviewed && prev.Trust == index.Reviewed) {
 		return scanInfo{}, false
 	}
 	return scanInfo{
