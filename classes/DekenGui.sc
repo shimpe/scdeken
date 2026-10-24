@@ -12,7 +12,7 @@ DekenGui {
 	classvar <columnWidths;   // type, name, status; the summary gets the rest
 	var <window, <sidebar, stack, <details, <search, <kindButtons, <unreviewedBox, <tree, logView, statusLabel, activity;
 	var <rows, items, generation = 0, searchToken = 0, kind, page = 0, selectedName, selectedRow;
-	var <installed, catalog, busy, log;
+	var <installed, catalog, busy, log, jobPlans;
 
 	*initClass {
 		kinds = [["All", nil], ["Plugins", "plugin"], ["Quarks", "quark"], ["Plugin + Quark", "plugin+quark"]];
@@ -28,7 +28,7 @@ DekenGui {
 
 	init {
 		rows = []; items = []; installed = Dictionary.new; catalog = Dictionary.new;
-		busy = Set.new;
+		busy = Set.new; jobPlans = Dictionary.new;
 		if(DekenSettings.get(\helperPath).notEmpty) { Deken.helperPath = DekenSettings.get(\helperPath) };
 		this.prBuildWindow;
 		log.hook({ |fraction, label| activity.string = "% %%".format(label, (fraction * 100).round.asInteger) });
@@ -290,6 +290,8 @@ DekenGui {
 	}
 
 	prRun { |name, version, verb|
+		// The plan on show, if it is this package's, says whether a failure was a local build.
+		jobPlans[name.toLower] = details.plan !? { |p| if(p["package"] == name) { p } };
 		this.prSetBusy(name, true, verb ++ " " ++ name);
 		Deken.install(name, version, { |r| { this.prInstallResult(name, version, r) }.defer })
 	}
@@ -301,11 +303,22 @@ DekenGui {
 			this.prReloadInstalled;
 			if(r[\after_install].notNil and: { r[\after_install].notEmpty }) { DekenDialogs.afterInstall(r[\after_install]) }
 		} {
-			this.prFailed("Could not install " ++ name, r)
+			this.prInstallFailed(name, r)
 		}
 	}
 
+	// A failed local build offers to report the problem to the reviewers.
+	prInstallFailed { |name, r|
+		var plan = jobPlans[name.toLower];
+		var url;
+		if(plan.isNil or: { plan["route"] != "local-build" }) { ^this.prFailed("Could not install " ++ name, r) };
+		log.add("Could not install " ++ name ++ ": " ++ r.error);
+		url = DekenStyle.buildFailureIssueURL(name, plan["version"], plan["platform"] ? DekenHelper.platformKey, Main.version, log.lastLines(30));
+		DekenDialogs.buildFailed("Could not build " ++ name, r.error ? "Something went wrong.", url)
+	}
+
 	prConfirm { |name, version, r|
+		var changed = r.confirm.indexOfEqual("changed").notNil;
 		DekenDialogs.confirm(r.data, { |choices|
 			if(choices.isNil) {
 				this.prSetBusy(name, false, nil);
@@ -313,7 +326,7 @@ DekenGui {
 			} {
 				Deken.installConfirmed(name, version, choices, { |r2| { this.prInstallResult(name, version, r2) }.defer })
 			}
-		})
+		}, changed)
 	}
 
 	prAskRemove { |name|

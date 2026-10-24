@@ -14,10 +14,8 @@ TestDekenQuarksInstall : UnitTest {
 	}
 
 	tearDown {
-		var installed;
 		DekenQuarks.allowFileURLs_(false);
-		installed = DekenQuarks.prFind("DepDemo");
-		if(installed.notNil) { Quarks.uninstall("DepDemo") };
+		Quarks.uninstall("DepDemo");
 		this.run("rm -rf", Quarks.folder +/+ "DepDemo");
 		this.run("rm -rf", work);
 	}
@@ -60,7 +58,7 @@ TestDekenQuarksInstall : UnitTest {
 		};
 		["abc", "main", "1234567890123456789012345678901234567890; calc", "tags/1.0"].do { |bad|
 			this.assertException({ DekenQuarks.install("https://github.com/o/r", bad) }, Error, "refuses commit " ++ bad);
-			this.assertException({ DekenQuarks.checkout("NoSuchQuarkAnywhere", bad, "https://github.com/o/r") }, Error, "refuses commit on checkout " ++ bad)
+			this.assertException({ DekenQuarks.update("https://github.com/o/r", bad) }, Error, "refuses commit on update " ++ bad)
 		}
 	}
 
@@ -88,5 +86,55 @@ TestDekenQuarksInstall : UnitTest {
 		this.assert(Quarks.pathIsInstalled(quark.localPath), "the quark is linked");
 		this.assertEquals(File.exists(Quarks.folder +/+ "NoSuchQuarkAnywhere"), false, "no dependency was fetched");
 		this.assertEquals(File.exists(Quarks.folder +/+ "Other"), false, "no URL dependency was fetched");
+	}
+
+	// The .quark file's preInstall hook leaves a marker when it runs.
+	hookedQuarkFile {
+		var marker = (work +/+ "hook-ran").replace("\\", "/");
+		^"( name: \"DepDemo\", summary: \"s\", preInstall: { File.use(%, \"w\", { |f| f.write(\"x\") }) } )".format(marker.asCompileString)
+	}
+
+	test_aCommitThatCannotBeReachedRunsNothing {
+		var url;
+		if(this.inProfile.not) { ^this.assert(false, "this test must run through scripts/run-sclang-tests.sh") };
+		this.makeRepo(this.hookedQuarkFile);
+		url = "file:///" ++ repo.replace("\\", "/");
+		this.assertException({ DekenQuarks.install(url, String.fill(40, $9)) }, Error, "a commit the checkout cannot reach is an error");
+		this.assertEquals(File.exists(work +/+ "hook-ran"), false, "the install hook did not run");
+		this.assertEquals(Quarks.pathIsInstalled(Quarks.folder +/+ "DepDemo"), false, "the quark is not linked");
+	}
+
+	test_installRunsTheHookAfterTheCommitIsVerified {
+		var url, commit;
+		if(this.inProfile.not) { ^this.assert(false, "this test must run through scripts/run-sclang-tests.sh") };
+		this.makeRepo(this.hookedQuarkFile);
+		commit = DekenGit.commit(repo);
+		url = "file:///" ++ repo.replace("\\", "/");
+		DekenQuarks.install(url, commit);
+		this.assertEquals(DekenGit.commit(Quarks.folder +/+ "DepDemo"), commit);
+		this.assert(File.exists(work +/+ "hook-ran"), "the install hook ran");
+	}
+
+	test_updateFetchesAndRefusesLocalChanges {
+		var url, first, second;
+		if(this.inProfile.not) { ^this.assert(false, "this test must run through scripts/run-sclang-tests.sh") };
+		this.makeRepo("( name: \"DepDemo\", summary: \"s\" )");
+		first = DekenGit.commit(repo);
+		url = "file:///" ++ repo.replace("\\", "/");
+		DekenQuarks.install(url, first);
+		File.use(repo +/+ "classes/DepDemoClass.sc", "w", { |f| f.write("DepDemoClass { *two { ^2 } }\n") });
+		this.git("commit", "--quiet", "-am", "second");
+		second = DekenGit.commit(repo);
+		DekenQuarks.update(url, second);
+		this.assertEquals(DekenGit.commit(Quarks.folder +/+ "DepDemo"), second, "moved to a commit made after the clone");
+		File.use(Quarks.folder +/+ "DepDemo/classes/DepDemoClass.sc", "w", { |f| f.write("// mine\n") });
+		this.assertException({ DekenQuarks.update(url, first) }, Error, "a folder with changes of its own is left alone");
+		this.assertEquals(DekenGit.commit(Quarks.folder +/+ "DepDemo"), second);
+	}
+
+	test_repoKey {
+		this.assertEquals(DekenQuarks.repoKey("https://GitHub.com/Shimpe/sc-timeline.git/"), "github.com/shimpe/sc-timeline");
+		this.assertEquals(DekenQuarks.repoKey("git@github.com:shimpe/sc-timeline"), "github.com/shimpe/sc-timeline");
+		this.assertEquals(DekenQuarks.repoKey("http://github.com/shimpe/sc-timeline"), "github.com/shimpe/sc-timeline");
 	}
 }

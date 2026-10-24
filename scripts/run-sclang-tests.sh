@@ -10,7 +10,7 @@
 #   SCDEKEN_PROFILE   throwaway profile dir (default: a fresh temp dir, removed
 #                     afterwards). Platform.userAppSupportDir, userExtensionDir
 #                     and userConfigDir are redirected into it.
-#   SCDEKEN_TIMEOUT   seconds before sclang is killed (default 120)
+#   SCDEKEN_TIMEOUT   seconds before sclang is killed (default 300; TestDekenScTimeline clones from GitHub)
 #   SCDEKEN_SCRIPT    run this .scd instead of the test runner (scripts/gui-screenshots.scd);
 #                     it gets the same sandbox, fixtures and SCDEKEN_* variables
 #   (SCDEKEN_FIXTURES is set for the tests: built helper, signed test index, locks)
@@ -76,10 +76,10 @@ fi
 bash "$repo/scripts/make-sclang-fixtures.sh" "$profile/fixtures" "$profile" >&2
 export SCDEKEN_FIXTURES="$(native "$profile/fixtures")"
 export SCDEKEN_PROFILE="$(native "$profile")"
-export SCDEKEN_WATCHDOG=$(( ${SCDEKEN_TIMEOUT:-120} - 10 ))
+export SCDEKEN_WATCHDOG=$(( ${SCDEKEN_TIMEOUT:-300} - 10 ))
 export LOCALAPPDATA="$(command -v cygpath >/dev/null && cygpath -w "$profile" || echo "$profile")" # belt and braces
 set +e
-timeout "${SCDEKEN_TIMEOUT:-120}" "$sclang" -l "$(native "$profile/sclang_conf.yaml")" \
+timeout "${SCDEKEN_TIMEOUT:-300}" "$sclang" -l "$(native "$profile/sclang_conf.yaml")" \
 	"$(native "${SCDEKEN_SCRIPT:-$profile/run.scd}")" "${tests[@]}" </dev/null 2>&1 | tee "$profile/last-run.log"
 rc=${PIPESTATUS[0]}
 exit "$rc"

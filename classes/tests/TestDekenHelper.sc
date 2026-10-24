@@ -16,8 +16,8 @@ TestDekenHelper : UnitTest {
 		logLines = [];
 		DekenQuarks.override_((
 			install: { |url, commit| quarkCalls.add([\install, url, commit]) },
-			uninstall: { |name| quarkCalls.add([\uninstall, name]) },
-			checkout: { |name, commit| quarkCalls.add([\checkout, name, commit]) }
+			uninstall: { |path| quarkCalls.add([\uninstall, path]) },
+			update: { |url, commit| quarkCalls.add([\update, url, commit]) }
 		));
 	}
 
@@ -239,15 +239,75 @@ TestDekenHelper : UnitTest {
 	}
 
 	test_failedQuarkUninstallThrows {
-		DekenQuarks.override_((uninstall: { |name| false }));
-		this.assertException({ DekenQuarks.uninstall("Panola") }, Error, "uninstall failure throws");
-		DekenQuarks.override_((checkout: { |name, commit| false }));
-		this.assertException({ DekenQuarks.checkout("Panola", "abc") }, Error, "checkout failure throws");
+		DekenQuarks.override_((uninstall: { |path| false }));
+		this.assertException({ DekenQuarks.uninstall("/q/Panola") }, Error, "uninstall failure throws");
+		DekenQuarks.override_((update: { |url, commit| false }));
+		this.assertException({ DekenQuarks.update("https://github.com/o/Panola", "abc") }, Error, "update failure throws");
 	}
 
-	test_realQuarkUninstallOfUnknownNameThrows {
+	test_realQuarkUninstallOfUnknownFolderThrows {
 		DekenQuarks.override_(nil);
-		this.assertException({ DekenQuarks.uninstall("NoSuchQuarkAnywhere") }, Error, "unknown quark is an error");
+		this.assertException({ DekenQuarks.uninstall(Quarks.folder +/+ "NoSuchQuarkAnywhere") }, Error, "unknown quark is an error");
+	}
+
+	// ---- confirmations belong to the plan that was shown
+
+	test_installSendsTheCommitsOfThePlan {
+		var r = this.await("install", { |a| Deken.install("Panola", nil, a) });
+		this.assert(r.ok, "the commits of the plan just made match: " ++ r[\error]);
+	}
+
+	test_aChangedPlanIsAskedAgain {
+		var wrong = Dictionary.newFrom(["Sketchy", String.fill(40, $9)]);
+		var r = this.await("install", { |a| Deken.installConfirmed("Sketchy", nil, (confirm_unreviewed: true, commits: wrong), a) });
+		this.assertEquals(r[\needsConfirmation], true);
+		this.assertEquals(r.confirm, ["changed"]);
+		this.assertEquals(r[\error], "The package list changed since you confirmed; please check again.");
+		this.assertEquals(r.data["package"], "Sketchy", "with the new plan");
+		this.assertEquals(quarkCalls.size, 0, "nothing installed");
+	}
+
+	// ---- updates
+
+	test_updateWithoutANameUpdatesEverything {
+		var r = this.await("update", { |a| Deken.update(nil, a) });
+		this.assert(r.ok, "update ok: " ++ r[\error]);
+		this.assertEquals(r.data["results"].size, 0, "nothing is installed in the throwaway profile, so nothing to update");
+	}
+
+	test_anUpdatedQuarkIsFoundByItsAddress {
+		var result = Dictionary.newFrom(["plan", Dictionary.newFrom(["package", "ScTimeline", "is_update", true,
+			"quark", Dictionary.newFrom(["url", "https://github.com/shimpe/sc-timeline", "commit", "abc"])])]);
+		Deken.prInstallQuark(result);
+		this.assertEquals(quarkCalls.asArray, [[\update, "https://github.com/shimpe/sc-timeline", "abc"]]);
+	}
+
+	test_removeOfAQuarkUsesItsFolder {
+		var item = Dictionary.newFrom(["name", "ScTimeline", "quark_name", "sc-timeline", "source", "quark", "path", "/q/sc-timeline"]);
+		var r;
+		Deken.prRemoveQuark(item, { |resp| r = resp });
+		this.assert(r.ok, "removed");
+		this.assertEquals(quarkCalls.asArray, [[\uninstall, "/q/sc-timeline"]]);
+		this.assertEquals(Deken.prFindItem([item], "sc-timeline"), item, "found by the quark's own name too");
+		this.assertEquals(Deken.prFindItem([item], "sctimeline"), item, "and by the package name");
+	}
+
+	// ---- helper download
+
+	test_curlGivesUp {
+		var cmd = DekenHelper.curlCommand("out.part", "https://example.org/x");
+		this.assert(cmd.find("--connect-timeout").notNil and: { cmd.find("30").notNil }, cmd);
+		this.assert(cmd.find("--max-time").notNil and: { cmd.find("600").notNil }, cmd);
+		this.assert(DekenHelper.curlFailure(28).find("took too long").notNil, "a timeout says so");
+		this.assert(DekenHelper.curlFailure(6).find("curl exit code 6").notNil, "other failures keep the code");
+	}
+
+	test_jobListenersSurviveCmdPeriod {
+		var key = DekenHelper.prKey(\log, "jtest");
+		DekenHelper.prListen("jtest", { }, { });
+		this.assert(OSCdef.all[key].permanent, "Ctrl+. does not drop the job's log");
+		DekenHelper.prUnlisten("jtest");
+		this.assertEquals(OSCdef.all[key], nil, "freed when the job ends");
 	}
 
 	test_installConfirmedWithMissingHelperReportsFailure {

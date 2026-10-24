@@ -90,7 +90,7 @@ Deken {
 	*removeWithdrawn { |hit, action|
 		var item = hit["item"];
 		var problem = if(item["source"] == "quark") {
-			try { DekenQuarks.uninstall(item["name"]); nil } { |err|
+			try { DekenQuarks.uninstall(item["path"]); nil } { |err|
 				"Could not take the quark " ++ item["name"] ++ " out of SuperCollider: " ++ err.errorString
 			}
 		};
@@ -143,7 +143,7 @@ Deken {
 			var needed;
 			if(planned.ok) {
 				needed = this.prNeeded(planned.data);
-				if(needed.isEmpty) { this.installConfirmed(name, version, (), done) } {
+				if(needed.isEmpty) { this.installConfirmed(name, version, (commits: this.planCommits(planned.data)), done) } {
 					planned[\needsConfirmation] = true;
 					planned[\confirm] = needed;
 					done.value(planned)
@@ -155,22 +155,44 @@ Deken {
 	}
 
 	// Installs with the user's answers in choices, an Event such as
-	// (confirm_unreviewed: true, confirm_retracted: true, on_duplicate: "replace").
+	// (confirm_unreviewed: true, confirm_retracted: true, on_duplicate: "replace",
+	// commits: Deken.planCommits(plan)). With commits, the helper installs only
+	// if the plan is still the one shown; otherwise it asks again ("changed").
 	// Quarks (also the quark part of plugin+quark) are installed here once the
 	// helper has finished, dependencies first.
 	*installConfirmed { |name, version, choices, action|
 		var done = action ? { |r| this.prPostInstall(r, name, version) };
-		this.prRequest((command: "install", package: name.asString, version: version, choices: choices ? ()), { |r|
-			if(r.ok) { this.prInstallQuarks(r, done) } {
-				if(r.confirm.notEmpty) { r[\needsConfirmation] = true };
-				done.value(r)
-			}
-		})
+		this.prInstallRequest((command: "install", package: name.asString, version: version, choices: choices ? ()), done)
 	}
 
-	// Installs the newest version. Quarks are moved to it with DekenQuarks.checkout.
+	// Installs the newest version of name; without a name, of every package
+	// that has an update. Quarks are moved to it with DekenQuarks.update.
+	// Updating everything asks first (needsConfirmation, data["plans"]) when
+	// any of the packages needs the user's OK; answer with updateConfirmed.
 	*update { |name, action|
-		this.install(name, nil, action)
+		if(name.notNil) { ^this.install(name, nil, action) };
+		this.updateConfirmed((), action)
+	}
+
+	// Updates every package that has an update, with the user's answers (see
+	// installConfirmed).
+	*updateConfirmed { |choices, action|
+		var done = action ? { |r| this.prPostUpdates(r) };
+		this.prInstallRequest((command: "update", choices: choices ? ()), done)
+	}
+
+	// The commit of every package in a plan and its dependencies (or in each
+	// of the plans of an update answer), keyed by package name: what the user
+	// is shown, for the choices' commits.
+	*planCommits { |plan|
+		var commits = Dictionary.new;
+		var add = nil;
+		add = { |p|
+			commits[p["package"]] = p["commit"] ? "";
+			(p["depends"] ? []).do(add)
+		};
+		if(plan["plans"].notNil) { plan["plans"].do(add) } { add.value(plan) };
+		^commits
 	}
 
 	// Removes a package installed through sc-deken, or a quark.
@@ -178,7 +200,7 @@ Deken {
 		var done = action ? this.prDefaultAction("remove");
 		this.prRequest((command: "list"), { |listed|
 			var item = if(listed.ok) { this.prFindItem(listed.data, name) };
-			if(item.notNil and: { item["source"] == "quark" }) { this.prRemoveQuark(item["name"], done) } {
+			if(item.notNil and: { item["source"] == "quark" }) { this.prRemoveQuark(item, done) } {
 				this.prRequest((command: "remove", package: name.asString), done)
 			}
 		})
@@ -208,14 +230,27 @@ Deken {
 		^all.asSet.asArray.sort
 	}
 
-	*prFindItem { |items, name|
-		^items.detect { |i| i["name"].toLower == name.asString.toLower }
+	// Runs an install or update request and then the quark part of its results.
+	*prInstallRequest { |request, done|
+		this.prRequest(request, { |r|
+			if(r.ok) { this.prInstallQuarks(r, done) } {
+				if(r.confirm.notEmpty) { r[\needsConfirmation] = true };
+				done.value(r)
+			}
+		})
 	}
 
-	*prRemoveQuark { |name, done|
+	// The installed item called name: its package name, or a quark's own name.
+	*prFindItem { |items, name|
+		var wanted = name.asString.toLower;
+		^items.detect { |i| i["name"].toLower == wanted or: { (i["quark_name"] ? "").toLower == wanted } }
+	}
+
+	// Uninstalls the quark of a list item, found by its folder.
+	*prRemoveQuark { |item, done|
 		var response = try {
-			DekenQuarks.uninstall(name.asString);
-			DekenHelper.prResponse(true, Dictionary.newFrom(["removed", name.asString]), nil, [], 0)
+			DekenQuarks.uninstall(item["path"]);
+			DekenHelper.prResponse(true, Dictionary.newFrom(["removed", item["name"]]), nil, [], 0)
 		} { |err|
 			DekenHelper.prResponse(false, nil, err.errorString, [], 1)
 		};
@@ -247,7 +282,7 @@ Deken {
 		var ref = plan["quark"];
 		if(ref.notNil and: { res["kept"] != true }) {
 			if(plan["is_update"] == true) {
-				DekenQuarks.checkout(plan["package"], ref["commit"], ref["url"])
+				DekenQuarks.update(ref["url"], ref["commit"])
 			} {
 				DekenQuarks.install(ref["url"], ref["commit"])
 			}
@@ -307,7 +342,31 @@ Deken {
 	}
 
 	*prPostConfirmation { |r, name, version|
-		var choices = ();
+		this.prPostAsk(r, name, "Deken.installConfirmed(%, %, %)".format(
+			name.asString.asCompileString, version.asCompileString, this.prSuggestedChoices(r).asCompileString))
+	}
+
+	*prPostUpdates { |r|
+		var count;
+		if(r[\needsConfirmation] == true) {
+			^this.prPostAsk(r, "Updating", "Deken.updateConfirmed(%)".format(this.prSuggestedChoices(r).asCompileString))
+		};
+		if(r.ok.not) { ^this.prPostFailure(r) };
+		count = r.data["results"].size;
+		if(count == 0) { "sc-deken: everything is up to date.".postln } { "sc-deken: % packages updated.".format(count).postln }
+	}
+
+	// Posts what still needs the user's OK and the call that gives it.
+	*prPostAsk { |r, what, call|
+		var kinds = r.confirm.reject { |c| c == "changed" };
+		if(kinds.size < r.confirm.size) { ("sc-deken: " ++ r[\error]).postln };
+		"sc-deken: % needs your OK%. If you agree, run: %".format(
+			what, if(kinds.isEmpty) { "" } { " first: " ++ kinds.join(", ") }, call).postln
+	}
+
+	// Choices that say yes to everything r asks, for the plan r carries.
+	*prSuggestedChoices { |r|
+		var choices = (commits: this.planCommits(r.data));
 		r.confirm.do { |c|
 			switch(c,
 				"unreviewed", { choices[\confirm_unreviewed] = true },
@@ -315,7 +374,6 @@ Deken {
 				"duplicates", { choices[\on_duplicate] = "replace" }
 			)
 		};
-		"sc-deken: % needs your OK first: %. If you agree, run: Deken.installConfirmed(%, %, %)".format(
-			name, r.confirm.join(", "), name.asString.asCompileString, version.asCompileString, choices.asCompileString).postln
+		^choices
 	}
 }

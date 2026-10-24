@@ -102,6 +102,27 @@ JSON
 SCDEKEN_SIGNING_KEY="$(cat "$fx/keys/scdeken.key")" SCDEKEN_SIGNING_PASSWORD="$SCDEKEN_FIXTURE_PASSWORD" \
 	"$helper" index sign --in "$fx/advisory/index.json" >/dev/null
 
+# A third signed index for the real quark round trip (TestDekenScTimeline,
+# needs the network): ScTimeline at the commit the recipes repository
+# approved. Its folder is called sc-timeline, unlike the package.
+mkdir -p "$fx/sctimeline"
+cat > "$fx/sctimeline/index.json" <<JSON
+{
+  "schema": 1,
+  "generated": "2026-10-24T12:00:00Z",
+  "sc_versions": [{"version": "3.14.1", "api": 3, "min": "3.13.0"}],
+  "advisories": [],
+  "packages": [
+    {"name": "ScTimeline", "summary": "simple timeline for supercollider patterns", "repo": "https://github.com/shimpe/sc-timeline",
+     "license": "GPL-3.0", "kind": "quark", "trust": "reviewed", "stars": 0, "pushed": "2026-01-01T00:00:00Z",
+     "scanned_commit": "ca27d83083932fdb286fa8c3f67a76f91a74bfe5",
+     "versions": [{"version": "0.1.0", "commit": "ca27d83083932fdb286fa8c3f67a76f91a74bfe5"}]}
+  ]
+}
+JSON
+SCDEKEN_SIGNING_KEY="$(cat "$fx/keys/scdeken.key")" SCDEKEN_SIGNING_PASSWORD="$SCDEKEN_FIXTURE_PASSWORD" \
+	"$helper" index sign --in "$fx/sctimeline/index.json" >/dev/null
+
 # Bootstrap locks: the helper itself is "released" at a file:// URL.
 host="$os-$arch"
 cp "$helper" "$fx/dist/scdeken-$host$ext"

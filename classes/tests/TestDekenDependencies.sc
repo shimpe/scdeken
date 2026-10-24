@@ -8,7 +8,7 @@ TestDekenDependencies : UnitTest {
 		calls = List.new;
 		DekenQuarks.override_((
 			install: { |url, commit| calls.add([\install, url, commit]) },
-			checkout: { |name, commit, url| calls.add([\checkout, name, commit]) }
+			update: { |url, commit| calls.add([\update, url, commit]) }
 		));
 	}
 
@@ -31,7 +31,7 @@ TestDekenDependencies : UnitTest {
 		this.assertEquals(calls.asArray, [
 			[\install, "https://example.org/Deep", "aaa"],
 			[\install, "https://example.org/Extra", nil],
-			[\checkout, "Lib", "bbb"],
+			[\update, "https://example.org/Lib", "bbb"],
 			[\install, "https://example.org/App", "ccc"]]);
 	}
 

@@ -226,7 +226,7 @@ TestDekenAdvisory : UnitTest {
 		hit = this.check.data[0];
 		DekenQuarks.override_((
 			install: { |url, commit| finished = true },
-			checkout: { |name, commit| finished = true }));
+			update: { |url, commit| finished = true }));
 		DekenAdvisoryDialog.update(hit, { |p, a| plan = p; answer = a }, { |r| if(r.isNil) { cancelled = true } { finished = true } });
 		this.wait({ plan.notNil }, "the confirmation was asked for", 40);
 		this.assertEquals(plan["version"], "1.1.0", "the fixed version, not just the newest");

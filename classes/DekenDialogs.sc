@@ -19,50 +19,67 @@ DekenDialogs {
 		^kinds.asArray
 	}
 
-	// The answers to hand to Deken.installConfirmed. duplicate is "replace" or "keep".
-	*choicesFor { |kinds, duplicate|
+	// The answers to hand to Deken.installConfirmed. duplicate is "replace" or
+	// "keep". plan (optional) is the plan shown: its commits tie the answers to
+	// it, so the helper asks again if the package list changed meanwhile.
+	*choicesFor { |kinds, duplicate, plan|
 		var choices = ();
 		if(kinds.indexOfEqual("unreviewed").notNil) { choices[\confirm_unreviewed] = true };
 		if(kinds.indexOfEqual("retracted").notNil) { choices[\confirm_retracted] = true };
 		if(kinds.indexOfEqual("duplicates").notNil) { choices[\on_duplicate] = duplicate };
+		if(plan.notNil) { choices[\commits] = Deken.planCommits(plan) };
 		^choices
+	}
+
+	// The labels of the buttons that say yes. With only duplicates to decide,
+	// the two answers are the buttons; with nothing (a plan that changed
+	// since it was confirmed) there is a plain Install.
+	*yesLabels { |kinds|
+		case
+		{ kinds.indexOfEqual("unreviewed").notNil } { ^["I understand, build it"] }
+		{ kinds.indexOfEqual("retracted").notNil } { ^["Install anyway"] }
+		{ kinds.indexOfEqual("duplicates").notNil } { ^["Replace (old copy goes to a backup)", "Keep existing"] };
+		^["Install"]
 	}
 
 	// ---- confirmation
 
 	// Shows everything the plan needs the user to agree to. action gets the
-	// choices Event, or nil when the user cancels.
-	*confirm { |plan, action|
+	// choices Event, or nil when the user cancels. changed: the helper said
+	// the plan is not the one the user confirmed before, so say that first.
+	*confirm { |plan, action, changed = false|
 		var plans = this.confirmPlans(plan);
 		var kinds = this.confirmKinds(plans);
-		var w = this.prWindow("Please confirm", 560, (230 + (plans.size * 110)).min(640));
+		var w = this.prWindow("Please confirm", 560, (230 + (plans.size.max(1) * 110)).min(640));
 		var duplicate = PopUpMenu().items_(["Replace it (the old copy is moved to a backup folder)", "Keep the existing copy"]);
 		var answered = false;
 		var finish = { |choices| answered = true; w.close; action.value(choices) };
 		var cancel = Button().states_([["Cancel"]]).action_({ finish.value(nil) });
-		var canvas = View().layout_(VLayout(*(plans.collect { |p| this.prPlanSection(p) } ++ [nil])));
-		var yes = this.prConfirmButtons(kinds, duplicate, finish);
+		var sections = if(plans.isEmpty) { [plan] } { plans };
+		var canvas = View().layout_(VLayout(*(sections.collect { |p| this.prPlanSection(p) } ++ [nil])));
+		var yes = this.prConfirmButtons(kinds, duplicate, plan, finish);
 		var askDuplicate = kinds.indexOfEqual("duplicates").notNil and: { kinds.size > 1 };
-		w.layout = VLayout(
+		w.layout = VLayout(*[
+			if(changed) { this.prLabel("The package list changed since you confirmed; please check again.", true) },
 			this.prLabel("Nothing has been installed yet. This needs your OK first:", true),
 			ScrollView().canvas_(canvas).hasBorder_(false),
-			if(askDuplicate) { duplicate } { nil },
+			if(askDuplicate) { duplicate },
 			HLayout(nil, *(yes ++ [cancel]))
-		);
+		].select(_.notNil));
 		w.onClose = { if(answered.not) { action.value(nil) } };
 		this.prShow(w, cancel);
 		^w
 	}
 
-	// Buttons that say yes. With only duplicates to decide, the two answers are the buttons.
-	*prConfirmButtons { |kinds, duplicate, finish|
-		var yes = { |label, choice|
-			Button().states_([[label]]).action_({ finish.value(this.choicesFor(kinds, choice.value)) })
-		};
+	// Buttons that say yes (see yesLabels). The duplicates answer comes from
+	// the menu, unless the two answers are the buttons themselves.
+	*prConfirmButtons { |kinds, duplicate, plan, finish|
+		var labels = this.yesLabels(kinds);
 		var fromMenu = { ["replace", "keep"][duplicate.value] };
-		if(kinds.indexOfEqual("unreviewed").notNil) { ^[yes.value("I understand, build it", fromMenu)] };
-		if(kinds.indexOfEqual("retracted").notNil) { ^[yes.value("Install anyway", fromMenu)] };
-		^[yes.value("Replace (old copy goes to a backup)", "replace"), yes.value("Keep existing", "keep")]
+		var answers = if(labels.size == 2) { ["replace", "keep"] } { [fromMenu] };
+		^labels.collect { |label, i|
+			Button().states_([[label]]).action_({ finish.value(this.choicesFor(kinds, answers[i].value, plan)) })
+		}
 	}
 
 	*prPlanSection { |plan|
@@ -78,11 +95,15 @@ DekenDialogs {
 		^View().layout_(VLayout(*items).margins_(6)).background_(Color.grey(0.94))
 	}
 
-	// Names the repository and commit the package will be taken from.
+	// Names the repository and commit the package will be taken from. A
+	// dependency known only by its address has no commit: its newest one is
+	// taken.
 	*unreviewedText { |plan|
 		var repo = plan["repo"] ? "its repository";
-		^"Nobody has reviewed this package. It will be taken from % at commit % and run on your computer. Only go on if you trust its author.".format(
-			repo, plan["commit"].asString.keep(10))
+		var commit = plan["commit"].asString;
+		var where = if(commit.isEmpty) { "its newest commit (not pinned to a reviewed version)" } { "commit " ++ commit.keep(10) };
+		^"Nobody has reviewed this package. It will be taken from % at % and run on your computer. Only go on if you trust its author.".format(
+			repo, where)
 	}
 
 	*prRetractedViews { |plan|
@@ -213,6 +234,18 @@ DekenDialogs {
 		var w = this.prWindow(title, 460, 170);
 		var ok = Button().states_([["OK"]]).action_({ w.close });
 		w.layout = VLayout(this.prLabel(text), nil, HLayout(nil, ok));
+		this.prShow(w, ok);
+		^w
+	}
+
+	// A local build that failed: the message, a button that opens a pre-filled
+	// issue on the recipes repository (see DekenStyle.buildFailureIssueURL),
+	// and OK.
+	*buildFailed { |title, text, issueURL|
+		var w = this.prWindow(title, 520, 200);
+		var ok = Button().states_([["OK"]]).action_({ w.close });
+		var report = Button().states_([["Report this problem ↗"]]).action_({ issueURL.openOS });
+		w.layout = VLayout(this.prLabel(text), nil, HLayout(nil, report, ok));
 		this.prShow(w, ok);
 		^w
 	}

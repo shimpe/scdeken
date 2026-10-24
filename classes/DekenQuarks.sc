@@ -2,9 +2,19 @@
 // installs itself (the Go helper never runs git for them).
 //
 // Quarks reports many failures only by posting a message: Quarks.install
-// returns the Quark even when the clone failed, and Quarks.uninstall does
-// nothing for a name it does not know. So every call here checks the outcome
-// afterwards and throws an Error if it did not work.
+// returns the Quark even when the clone failed, and Quark:checkout only
+// warns about a folder with changes of its own. So every call here checks
+// the outcome afterwards and throws an Error if it did not work.
+//
+// An installed quark is found by its folder (uninstall) or by its
+// repository address (update), never by its name: the folder of
+// https://github.com/shimpe/sc-timeline is "sc-timeline" while the package
+// is called ScTimeline.
+//
+// Nothing of a quark runs before its commit is verified: the folder is
+// fetched and checked out, HEAD is compared with the commit (DekenGit reads
+// it from the files, no process), and only then do the compatibility check,
+// the install hooks and the link to the class library happen.
 //
 // Tests can replace the real calls with
 // `DekenQuarks.override_((install: { |url, commit| ... }, ...))`; a function
@@ -32,30 +42,78 @@ DekenQuarks {
 
 	// Installs the quark at url, pinned to commit (nil or "" = default branch).
 	*install { |url, commit|
-		var refspec = if(commit.isNil or: { commit.isEmpty }) { nil } { commit };
+		var refspec = this.prRefspec(commit);
 		var quark;
 		if(override.notNil) { ^this.prExpect(override[\install].value(url, refspec), "install " ++ url) };
 		this.prCheckSafe(url, refspec);
-		quark = this.prInstallOnly(url, refspec);
-		if(quark.isNil or: { Quarks.pathIsInstalled(quark.localPath).not }) {
-			Error("the quark at % could not be installed (see the messages above)".format(url)).throw
-		};
-		this.prVerifyCommit(quark, refspec);
+		quark = Quark(url, refspec);
+		this.prRefuseSecondCopy(quark, url);
+		this.prCheckOut(quark, refspec, url);
+		this.prLink(quark);
 		^quark
 	}
 
-	// Quarks.installQuark without its dependency loop: checks the quark out at
-	// refspec, runs the install hooks and adds it to the include paths.
-	*prInstallOnly { |url, refspec|
-		var quark = Quark(url, refspec);
-		var prev = this.prFind(quark.name);
-		if(prev.notNil and: { prev.localPath != quark.localPath }) {
-			Error("a version of % is already installed at %".format(quark.name, prev.localPath)).throw
+	// Moves the installed quark that came from url to commit (fetching first),
+	// or installs it when none is installed.
+	*update { |url, commit|
+		var refspec = this.prRefspec(commit);
+		var quark;
+		if(override.notNil) { ^this.prExpect(override[\update].value(url, refspec), "update " ++ url) };
+		this.prCheckSafe(url, refspec);
+		quark = this.prFindByURL(url);
+		if(quark.isNil) { ^this.install(url, commit) };
+		quark.refspec = refspec;
+		this.prCheckOut(quark, refspec, url);
+		Quarks.clearCache;
+		^quark
+	}
+
+	// Uninstalls the quark in the folder path (the path the helper's list
+	// reports).
+	*uninstall { |path|
+		var quark;
+		if(override.notNil) { ^this.prExpect(override[\uninstall].value(path), "uninstall " ++ path) };
+		quark = this.prFindByPath(path);
+		if(quark.isNil) { Error("no quark is installed at %".format(path)).throw };
+		Quarks.uninstallQuark(quark);
+		if(this.prFindByPath(path).notNil) { Error("the quark % could not be uninstalled".format(quark.name)).throw };
+	}
+
+	// ---- the steps
+
+	*prRefspec { |commit| ^if(commit.isNil or: { commit.isEmpty }) { nil } { commit } }
+
+	// Another folder already linked for the same repository would define
+	// every class twice.
+	*prRefuseSecondCopy { |quark, url|
+		var prev = this.prFindByURL(url);
+		if(prev.notNil and: { this.prSamePath(prev.localPath, quark.localPath).not }) {
+			Error("% is already installed at %".format(url, prev.localPath)).throw
+		}
+	}
+
+	// Brings the folder to refspec: clones it, or (when it is there already)
+	// refuses changes of its own and fetches. Then checks out and verifies the
+	// commit, before any of the quark's code can run.
+	*prCheckOut { |quark, refspec, url|
+		if(quark.isDownloaded) {
+			if(Git.isGit(quark.localPath).not) {
+				Error("% is not a git checkout, so % is not installed there".format(quark.localPath, url)).throw
+			};
+			if(quark.git.isDirty) {
+				Error("% has changes of its own, so it is left as it is".format(quark.localPath)).throw
+			};
+			quark.git.fetch;
 		};
 		quark.checkout;
 		if(Git.isGit(quark.localPath).not) {
 			Error("the quark at % could not be downloaded".format(url)).throw
 		};
+		this.prVerifyCommit(quark, refspec);
+	}
+
+	// What Quarks.installQuark does apart from the dependency loop.
+	*prLink { |quark|
 		if(quark.isCompatible.not) {
 			Error("% reports an incompatibility with this SuperCollider version or with other installed quarks".format(quark.name)).throw
 		};
@@ -63,37 +121,23 @@ DekenQuarks {
 		Quarks.link(quark.localPath);
 		quark.runHook('postInstall');
 		Quarks.clearCache;
-		^quark
+		if(Quarks.pathIsInstalled(quark.localPath).not) {
+			Error("the quark % could not be added to the class library".format(quark.name)).throw
+		}
 	}
 
-	// Uninstalls the quark called name (any capitalisation).
-	*uninstall { |name|
-		var quark;
-		if(override.notNil) { ^this.prExpect(override[\uninstall].value(name), "uninstall " ++ name) };
-		quark = this.prFind(name);
-		if(quark.isNil) { Error("the quark % is not installed".format(name)).throw };
-		Quarks.uninstall(quark.name);
-		Quarks.clearCache;
-		if(this.prFind(name).notNil) { Error("the quark % could not be uninstalled".format(name)).throw };
+	// When refspec is a commit id, the checked-out commit must be it.
+	*prVerifyCommit { |quark, refspec|
+		var head;
+		if(refspec.notNil) {
+			head = DekenGit.commit(quark.localPath);
+			if(head.isNil or: { head != refspec.toLower }) {
+				Error("% is not at commit % (it is at %), so none of its code was run".format(quark.localPath, refspec, head)).throw
+			}
+		}
 	}
 
-	// Moves an installed quark (found by name) to commit. If it is not installed
-	// and a url is given, installs it from there instead.
-	*checkout { |name, commit, url|
-		var quark;
-		if(override.notNil) { ^this.prExpect(override[\checkout].value(name, commit), "checkout " ++ name) };
-		quark = this.prFind(name);
-		if(quark.isNil) {
-			if(url.isNil) { Error("the quark % is not installed".format(name)).throw };
-			^this.install(url, commit)
-		};
-		this.prCheckSafe(nil, commit);
-		quark.git.fetch;
-		quark.refspec = commit;
-		quark.checkout;
-		this.prVerifyCommit(quark, commit);
-		^quark
-	}
+	// ---- safety
 
 	// SuperCollider's Git builds a shell command from the address and the
 	// refspec without quoting them, so nothing else than a plain https address
@@ -121,18 +165,42 @@ DekenQuarks {
 		^result
 	}
 
-	// When refspec is a commit id, the checked-out commit must be it.
-	*prVerifyCommit { |quark, refspec|
-		var sha;
-		if(refspec.notNil and: { "^[0-9a-fA-F]{7,40}$".matchRegexp(refspec) }) {
-			sha = quark.git.sha;
-			if(sha.isNil or: { sha.beginsWith(refspec.toLower).not }) {
-				Error("the quark % is not at commit %".format(quark.name, refspec)).throw
-			}
-		}
+	// ---- finding installed quarks
+
+	*prFindByURL { |url|
+		var key = this.repoKey(url);
+		^Quarks.installed.detect { |q| (DekenGit.url(q.localPath) !? { |u| this.repoKey(u) }) == key }
 	}
 
-	*prFind { |name|
-		^Quarks.installed.detect { |q| q.name.toLower == name.asString.toLower }
+	*prFindByPath { |path|
+		^Quarks.installed.detect { |q| this.prSamePath(q.localPath, path) }
+	}
+
+	// The same repository address however it is written (case, scheme,
+	// trailing / or .git), like the helper's NormalizeRepo.
+	*repoKey { |url|
+		var s = url.asString.stripWhiteSpace.toLower;
+		var scheme;
+		if(s.beginsWith("git@")) { s = s.copyToEnd(4).replace(":", "/") };
+		scheme = ["https://", "http://", "git://", "ssh://git@", "ssh://"].detect { |p| s.beginsWith(p) };
+		if(scheme.notNil) { s = s.copyToEnd(scheme.size) };
+		s = this.prTrimSlashes(s);
+		if(s.endsWith(".git")) { s = this.prTrimSlashes(s.drop(-4)) };
+		^s
+	}
+
+	*prTrimSlashes { |s|
+		var end = s.size;
+		while { end > 0 and: { s[end - 1] == $/ } } { end = end - 1 };
+		^s.keep(end)
+	}
+
+	// Windows paths compare without case and with either slash.
+	*prSamePath { |a, b|
+		var norm = { |p|
+			var s = p.asString.replace(92.asAscii.asString, "/").withoutTrailingSlash;
+			if(DekenShell.isWindows) { s.toLower } { s }
+		};
+		^norm.value(a) == norm.value(b)
 	}
 }
