@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -439,5 +440,71 @@ func TestBuildTopicRepoKeepsKindFromTopics(t *testing.T) {
 	}
 	if q := pkgNamed(t, ix, "quarky"); q.Kind != recipe.KindQuark {
 		t.Errorf("quarky = %+v", q)
+	}
+}
+
+// quarkScan is a scan of a quark with the given dependencies.
+func quarkScan(deps ...discover.Dependency) discover.Scan {
+	return discover.Scan{Kind: recipe.KindQuark, HasQuark: true, Quark: discover.QuarkFile{Dependencies: deps}}
+}
+
+func TestBuildResolvesDependencies(t *testing.T) {
+	const (
+		aURL = "https://github.com/a/alpha"
+		bURL = "https://github.com/b/beta"
+		cURL = "https://github.com/c/gamma"
+	)
+	s := &fakeScanner{
+		refs: map[string]fakeRefs{aURL: {head: sha9}, bURL: {head: sha9}, cURL: {head: sha9}},
+		scans: map[string]discover.Scan{
+			aURL: quarkScan(
+				discover.Dependency{Name: "BETA"},
+				discover.Dependency{Name: "gamma", URL: "git://github.com/C/Gamma.git", Refspec: "tags/1.2"},
+				discover.Dependency{Name: "elsewhere", URL: "https://example.org/x/elsewhere", Refspec: "tags/2.0"},
+				discover.Dependency{Name: "Missing", Refspec: "main"},
+			),
+			bURL: quarkScan(),
+			cURL: quarkScan(),
+		},
+	}
+	r := fmxRecipe()
+	r.Depends = map[string]string{"https://github.com/b/beta.git": ">=1.0", "fmx6x": "*"}
+	ix := build(t, s, Inputs{
+		Recipes: []recipe.Recipe{r},
+		Directory: []discover.Entry{
+			{Name: "Alpha", URL: aURL}, {Name: "Beta", URL: bURL}, {Name: "Gamma", URL: cURL},
+		},
+	})
+	alpha := pkgNamed(t, ix, "Alpha")
+	wantDepends := map[string]string{"Beta": "*", "Gamma": "=1.2", "Missing": "*"}
+	if !reflect.DeepEqual(alpha.Depends, wantDepends) {
+		t.Errorf("Alpha depends = %v, want %v", alpha.Depends, wantDepends)
+	}
+	wantUnresolved := map[string]string{"https://example.org/x/elsewhere": "=2.0"}
+	if !reflect.DeepEqual(alpha.DependsUnresolved, wantUnresolved) {
+		t.Errorf("Alpha unresolved = %v, want %v", alpha.DependsUnresolved, wantUnresolved)
+	}
+	fmx := pkgNamed(t, ix, "fmx6")
+	if !reflect.DeepEqual(fmx.Depends, map[string]string{"Beta": ">=1.0", "fmx6x": "*"}) || fmx.DependsUnresolved != nil {
+		t.Errorf("fmx6 depends = %v, unresolved = %v", fmx.Depends, fmx.DependsUnresolved)
+	}
+	if !reflect.DeepEqual(alpha.QuarkDeps, []string{"BETA", "git://github.com/C/Gamma.git@tags/1.2", "https://example.org/x/elsewhere@tags/2.0", "Missing@main"}) {
+		t.Errorf("QuarkDeps = %v", alpha.QuarkDeps)
+	}
+}
+
+func TestBuildCachedScanKeepsDependencies(t *testing.T) {
+	url := "https://github.com/a/q"
+	prev := previousWith(url)
+	prev.Packages[0].QuarkDeps = []string{"Other@tags/1.0", "https://example.org/z/Zed"}
+	s := &fakeScanner{refs: map[string]fakeRefs{url: {head: sha9}}}
+	ix := build(t, s, Inputs{Directory: []discover.Entry{{Name: "Q", URL: url}}, Previous: prev})
+	if len(s.scanned) != 0 {
+		t.Fatalf("scanned %v", s.scanned)
+	}
+	p := pkgNamed(t, ix, "Q")
+	if !reflect.DeepEqual(p.Depends, map[string]string{"Other": "=1.0"}) ||
+		!reflect.DeepEqual(p.DependsUnresolved, map[string]string{"https://example.org/z/Zed": "*"}) {
+		t.Errorf("depends = %v, unresolved = %v", p.Depends, p.DependsUnresolved)
 	}
 }

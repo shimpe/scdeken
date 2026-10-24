@@ -57,7 +57,7 @@ func TestParseQuarkFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := QuarkFile{Name: "Panola", Summary: `Notation "quoted"`, Version: "1.1",
-		Dependencies: []string{"TemporalDict", "https://github.com/x/y", "Sym", "Other"}}
+		Dependencies: []Dependency{{Name: "TemporalDict"}, {Name: "y", URL: "https://github.com/x/y"}, {Name: "Sym"}, {Name: "Other"}}}
 	if !reflect.DeepEqual(q, want) {
 		t.Fatalf("got %+v", q)
 	}

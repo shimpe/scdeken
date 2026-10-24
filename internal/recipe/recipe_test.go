@@ -192,3 +192,42 @@ func TestMarshalRoundTrip(t *testing.T) {
 		t.Errorf("output does not end with approved table:\n%s", out)
 	}
 }
+
+func TestDependsKeysAndConstraints(t *testing.T) {
+	good := quarkRecipe("\n[depends]\nOther = \">=1.0,<2.0\"\n\"https://github.com/o/Repo.git\" = \"=1.2\"\nThird = \"*\"\n")
+	r, err := Parse([]byte(good))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Depends["https://github.com/o/Repo.git"] != "=1.2" || len(r.Depends) != 3 {
+		t.Errorf("depends = %v", r.Depends)
+	}
+	bad := map[string]string{
+		"http url":       "\"http://github.com/o/Repo\" = \"*\"",
+		"git url":        "\"git://github.com/o/Repo\" = \"*\"",
+		"bad name":       "\"-bad\" = \"*\"",
+		"bad constraint": "Other = \"~1.0\"",
+		"empty key":      "\"\" = \"*\"",
+	}
+	for name, line := range bad {
+		if _, err := Parse([]byte(quarkRecipe("\n[depends]\n" + line + "\n"))); err == nil {
+			t.Errorf("%s: expected error", name)
+		}
+	}
+}
+
+func TestMarshalURLDependsRoundTrip(t *testing.T) {
+	r, err := Parse([]byte(quarkRecipe("")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Depends = map[string]string{"Name": "*", "https://github.com/o/Repo": "=1.0"}
+	out, err := Marshal(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	back, err := Parse(out)
+	if err != nil || !reflect.DeepEqual(r.Depends, back.Depends) {
+		t.Errorf("err = %v, depends = %v\n%s", err, back.Depends, out)
+	}
+}

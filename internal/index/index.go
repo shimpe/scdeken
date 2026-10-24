@@ -39,26 +39,28 @@ type Index struct {
 
 // Package is one installable plugin or quark.
 type Package struct {
-	Name          string                        `json:"name"`
-	Summary       string                        `json:"summary"`
-	Repo          string                        `json:"repo"`
-	License       string                        `json:"license"`
-	Authors       []string                      `json:"authors,omitempty"`
-	Kind          recipe.Kind                   `json:"kind"`
-	Trust         Trust                         `json:"trust"`
-	Stars         int                           `json:"stars"`
-	Pushed        time.Time                     `json:"pushed"`
-	ScannedCommit string                        `json:"scanned_commit"`
-	Classes       []string                      `json:"classes,omitempty"`
-	UGens         []string                      `json:"ugens,omitempty"`
-	QuarkName     string                        `json:"quark_name,omitempty"`    // scan result: name in the .quark file
-	QuarkSummary  string                        `json:"quark_summary,omitempty"` // scan result: summary in the .quark file
-	LicenseFile   string                        `json:"license_file,omitempty"`  // scan result: SPDX guess from the license file
-	PluginFiles   []string                      `json:"plugin_files,omitempty"`  // e.g. "FMX6.scx", "FMX6_supernova.scx"
-	Depends       map[string]string             `json:"depends,omitempty"`
-	Build         *recipe.Build                 `json:"build,omitempty"`
-	Requires      map[string]recipe.Requirement `json:"requires,omitempty"`
-	Versions      []Release                     `json:"versions"` // newest first
+	Name              string                        `json:"name"`
+	Summary           string                        `json:"summary"`
+	Repo              string                        `json:"repo"`
+	License           string                        `json:"license"`
+	Authors           []string                      `json:"authors,omitempty"`
+	Kind              recipe.Kind                   `json:"kind"`
+	Trust             Trust                         `json:"trust"`
+	Stars             int                           `json:"stars"`
+	Pushed            time.Time                     `json:"pushed"`
+	ScannedCommit     string                        `json:"scanned_commit"`
+	Classes           []string                      `json:"classes,omitempty"`
+	UGens             []string                      `json:"ugens,omitempty"`
+	QuarkName         string                        `json:"quark_name,omitempty"`    // scan result: name in the .quark file
+	QuarkSummary      string                        `json:"quark_summary,omitempty"` // scan result: summary in the .quark file
+	LicenseFile       string                        `json:"license_file,omitempty"`  // scan result: SPDX guess from the license file
+	QuarkDeps         []string                      `json:"quark_deps,omitempty"`    // scan result: dependencies in the .quark file, as written
+	PluginFiles       []string                      `json:"plugin_files,omitempty"`  // e.g. "FMX6.scx", "FMX6_supernova.scx"
+	Depends           map[string]string             `json:"depends,omitempty"`
+	DependsUnresolved map[string]string             `json:"depends_unresolved,omitempty"` // repository address → constraint, for dependencies no package matches
+	Build             *recipe.Build                 `json:"build,omitempty"`
+	Requires          map[string]recipe.Requirement `json:"requires,omitempty"`
+	Versions          []Release                     `json:"versions"` // newest first
 }
 
 // Release is one version of a package.

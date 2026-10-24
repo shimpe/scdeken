@@ -180,6 +180,9 @@ func (r Recipe) Validate() error {
 	if err := r.validateApproved(); err != nil {
 		return fmt.Errorf("recipe %s: %w", r.Name, err)
 	}
+	if err := r.validateDepends(); err != nil {
+		return fmt.Errorf("recipe %s: %w", r.Name, err)
+	}
 	return nil
 }
 
@@ -237,3 +240,24 @@ func (r Recipe) ApprovedVersions() []string {
 	}
 	return out
 }
+
+// validateDepends checks the [depends] table: each key is a package name or
+// an https repository address, each value a version constraint.
+func (r Recipe) validateDepends() error {
+	for key, constraint := range r.Depends {
+		if !namePattern.MatchString(key) && !IsDependencyURL(key) {
+			return fmt.Errorf("dependency %q must be a package name or an https:// repository address", key)
+		}
+		if key == "https://" {
+			return fmt.Errorf("dependency %q has no repository address", key)
+		}
+		if _, err := version.ParseConstraint(constraint); err != nil {
+			return fmt.Errorf("dependency %s: %w", key, err)
+		}
+	}
+	return nil
+}
+
+// IsDependencyURL reports whether a [depends] key is a repository address
+// rather than a package name.
+func IsDependencyURL(key string) bool { return strings.HasPrefix(key, "https://") }

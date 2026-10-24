@@ -94,6 +94,7 @@ func Build(ctx context.Context, s Scanner, in Inputs) (*index.Index, error) {
 		b.names[key] = true
 		ix.Packages = append(ix.Packages, pkg)
 	}
+	resolveDepends(ix.Packages)
 	return ix, nil
 }
 

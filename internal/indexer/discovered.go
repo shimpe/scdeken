@@ -35,6 +35,7 @@ func (b *builder) discovered(ctx context.Context, c candidate) (index.Package, b
 		Repo: c.url, Kind: kind, Trust: c.trust,
 		QuarkName: info.QuarkName, QuarkSummary: info.QuarkSummary, LicenseFile: info.LicenseFile,
 		Classes: info.Classes, UGens: info.UGens, Build: info.Build, Versions: versions,
+		QuarkDeps: info.QuarkDeps, Depends: dependsFromQuark(info.QuarkDeps),
 	}
 	if scanned {
 		pkg.ScannedCommit = head
@@ -124,6 +125,7 @@ type scanInfo struct {
 	LicenseFile    string // SPDX guess from the license file
 	Kind           recipe.Kind
 	Build          *recipe.Build
+	QuarkDeps      []string // dependencies in the .quark file, as written
 	Classes, UGens []string
 }
 
@@ -164,6 +166,7 @@ func (b *builder) cached(url, commit string, reviewed bool) (scanInfo, bool) {
 	return scanInfo{
 		QuarkName: prev.QuarkName, QuarkSummary: prev.QuarkSummary, LicenseFile: prev.LicenseFile,
 		Kind: prev.Kind, Build: prev.Build, Classes: prev.Classes, UGens: prev.UGens,
+		QuarkDeps: prev.QuarkDeps,
 	}, true
 }
 
@@ -171,11 +174,25 @@ func infoFromScan(s discover.Scan) scanInfo {
 	info := scanInfo{
 		QuarkName: s.Quark.Name, QuarkSummary: s.Quark.Summary, LicenseFile: s.LicenseFile,
 		Kind: s.Kind, Classes: s.Classes, UGens: s.UGens,
+		QuarkDeps: rawDependencies(s.Quark.Dependencies),
 	}
 	if s.CMakeDir != "" {
 		info.Build = discover.DraftBuild(s)
 	}
 	return info
+}
+
+// copyMap returns a copy of m, so resolving one package's dependencies never
+// changes the recipe it came from.
+func copyMap(m map[string]string) map[string]string {
+	if m == nil {
+		return nil
+	}
+	out := make(map[string]string, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
 }
 
 // repoName is the last path segment of a repository address.

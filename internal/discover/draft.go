@@ -147,9 +147,9 @@ func DraftRecipe(url string, meta github.Repo, scan Scan, head string, tags map[
 		Repo:    "https://github.com/" + owner + "/" + repo,
 		Authors: []string{owner},
 		Kind:    scan.Kind,
-		Depends: draftDepends(scan),
 	}
 	var notes []string
+	r.Depends, notes = draftDepends(scan)
 	r.Summary, notes = draftSummary(meta, scan, notes)
 	r.License, notes = draftLicense(meta, scan, notes)
 	if r.HasPlugin() {
@@ -208,19 +208,39 @@ func DraftBuild(scan Scan) *recipe.Build {
 	return b
 }
 
-// draftDepends keeps the quark dependencies that are plain package names.
-func draftDepends(scan Scan) map[string]string {
+// draftDepends turns the quark's dependencies into [depends] entries: a name
+// or an https repository address as the key, the constraint from the
+// refspec as the value. Entries that cannot be written are left out and
+// explained in the notes.
+func draftDepends(scan Scan) (map[string]string, []string) {
+	notes := append([]string(nil), scan.Quark.Notes...)
 	var depends map[string]string
 	for _, dep := range scan.Quark.Dependencies {
-		if !plainName.MatchString(dep) {
+		key, ok := recipeKey(dep)
+		if !ok {
+			notes = append(notes, "dependency "+dep.String()+": only names and https addresses can be listed; add it by hand")
 			continue
+		}
+		constraint, note := dep.Constraint()
+		if note != "" {
+			notes = append(notes, note)
 		}
 		if depends == nil {
 			depends = map[string]string{}
 		}
-		depends[dep] = "*"
+		depends[key] = constraint
 	}
-	return depends
+	return depends, notes
+}
+
+// recipeKey is the [depends] key for dep: its name, or its address made
+// https. ok is false for an address that is not git:// or https://.
+func recipeKey(dep Dependency) (string, bool) {
+	key := dep.Key()
+	if dep.URL != "" && !strings.HasPrefix(key, "https://") {
+		return "", false
+	}
+	return key, true
 }
 
 func short(commit string) string {

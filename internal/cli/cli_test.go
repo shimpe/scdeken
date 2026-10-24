@@ -101,7 +101,18 @@ func testIndex(zipURL, sum string) *index.Index {
 			mk("fmx6", index.Reviewed), mk("wild", index.Unreviewed),
 			quark("risky-app", index.Unreviewed, "fmx6"), // unreviewed main, reviewed dependency
 			quark("safe-app", index.Reviewed, "wild"),    // reviewed main, unreviewed dependency
+			urlDepQuark(), // reviewed main, dependency only known by repository address
 		},
+	}
+}
+
+// urlDepQuark is a reviewed quark that depends on a repository the index does
+// not list.
+func urlDepQuark() index.Package {
+	return index.Package{
+		Name: "url-app", Repo: "https://github.com/example/url-app", Kind: recipe.KindQuark, Trust: index.Reviewed,
+		DependsUnresolved: map[string]string{"https://github.com/other/Extra": "=1.0"},
+		Versions:          []index.Release{{Version: "1.0.0", Commit: strings.Repeat("4", 40)}},
 	}
 }
 
@@ -393,5 +404,23 @@ func TestInstallUnreviewedDependencyNeedsConfirmation(t *testing.T) {
 	}
 	if !nothingInstalled(w) {
 		t.Error("something was installed before the dependency was confirmed")
+	}
+}
+
+func TestInstallQuarkWithURLDependencyNeedsConfirmation(t *testing.T) {
+	w := newWorld(t)
+	code, out, _ := w.call(t, "install", "url-app")
+	r := decode(t, out)
+	plan, _ := r.Data.(map[string]any)
+	deps, _ := plan["depends"].([]any)
+	if code != 3 || !reflect.DeepEqual(r.Confirm, []string{"unreviewed"}) || plan["package"] != "url-app" || len(deps) != 1 {
+		t.Fatalf("exit %d, response %+v", code, r)
+	}
+	dep := deps[0].(map[string]any)
+	if dep["package"] != "Extra" || dep["repo"] != "https://github.com/other/Extra" || dep["route"] != "quark" || dep["trust"] != "unreviewed" {
+		t.Errorf("dependency plan = %v", dep)
+	}
+	if conf, _ := dep["confirm"].([]any); len(conf) != 1 || conf[0] != "unreviewed" {
+		t.Errorf("dependency confirm = %v", dep["confirm"])
 	}
 }

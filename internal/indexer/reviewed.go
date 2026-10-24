@@ -20,7 +20,7 @@ func (b *builder) reviewed(ctx context.Context, r recipe.Recipe) index.Package {
 	pkg := index.Package{
 		Name: r.Name, Summary: r.Summary, Repo: r.Repo, License: r.License,
 		Authors: r.Authors, Kind: r.Kind, Trust: index.Reviewed,
-		Depends: r.Depends, Build: r.Build, Requires: r.Requires,
+		Depends: copyMap(r.Depends), Build: r.Build, Requires: r.Requires,
 	}
 	for _, v := range approved {
 		pkg.Versions = append(pkg.Versions, b.release(r, v))

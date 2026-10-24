@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/shimpe/scdeken/internal/advisory"
@@ -93,11 +92,9 @@ func (s *Service) Plan(ctx context.Context, name, version string) (Plan, error) 
 		return Plan{}, err
 	}
 	plan.IsUpdate = s.installed(pkg)
-	walk := dependencyWalk{s: s, done: map[string]bool{}}
-	if err := walk.visit(ctx, pkg, []string{pkg.Name}); err != nil {
+	if plan.Depends, err = s.planDependencies(ctx, pkg); err != nil {
 		return Plan{}, err
 	}
-	plan.Depends = walk.order
 	return plan, nil
 }
 
@@ -262,73 +259,4 @@ func (s *Service) installed(pkg *index.Package) bool {
 		}
 	}
 	return false
-}
-
-// dependencyWalk collects the plans of all missing dependencies, children
-// before parents.
-type dependencyWalk struct {
-	s     *Service
-	done  map[string]bool // lowercase names already handled
-	order []Plan
-}
-
-// visit plans every dependency of pkg. path holds the names leading here,
-// for cycle errors.
-func (w *dependencyWalk) visit(ctx context.Context, pkg *index.Package, path []string) error {
-	for _, depName := range sortedKeys(pkg.Depends) {
-		dep, ok := w.s.Index.Find(depName)
-		if !ok {
-			return fmt.Errorf("%s needs %q, which is not in the package list", pkg.Name, depName)
-		}
-		if err := w.visitOne(ctx, dep, path); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (w *dependencyWalk) visitOne(ctx context.Context, dep *index.Package, path []string) error {
-	if cycle := cycleAt(path, dep.Name); cycle != "" {
-		return fmt.Errorf("dependency cycle: %s", cycle)
-	}
-	key := strings.ToLower(dep.Name)
-	if w.done[key] {
-		return nil
-	}
-	w.done[key] = true
-	if w.s.installed(dep) {
-		return nil
-	}
-	rel, ok := w.s.Index.Latest(dep)
-	if !ok {
-		return fmt.Errorf("%s has no versions to install", dep.Name)
-	}
-	if err := w.visit(ctx, dep, append(path[:len(path):len(path)], dep.Name)); err != nil {
-		return err
-	}
-	plan, err := w.s.planOne(ctx, dep, rel)
-	if err != nil {
-		return err
-	}
-	w.order = append(w.order, plan)
-	return nil
-}
-
-// cycleAt returns "A → B → A" when name is already on path, else "".
-func cycleAt(path []string, name string) string {
-	for i, n := range path {
-		if strings.EqualFold(n, name) {
-			return strings.Join(append(path[i:len(path):len(path)], name), " → ")
-		}
-	}
-	return ""
-}
-
-func sortedKeys(m map[string]string) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
 }

@@ -9,7 +9,8 @@ import (
 // QuarkFile holds the fields we read from a .quark file.
 type QuarkFile struct {
 	Name, Summary, Version string
-	Dependencies           []string
+	Dependencies           []Dependency
+	Notes                  []string // dependency entries that were skipped, and why
 }
 
 // ParseQuarkFile reads the Event literal `( key: value, ... )` of a .quark
@@ -74,7 +75,7 @@ func (p *quarkParser) pair(q *QuarkFile) error {
 	case "version":
 		return p.stringInto(&q.Version)
 	case "dependencies":
-		return p.listInto(&q.Dependencies)
+		return p.dependenciesInto(q)
 	}
 	return p.skipValue()
 }
@@ -89,8 +90,9 @@ func (p *quarkParser) stringInto(dst *string) error {
 	return err
 }
 
-// listInto reads [ "a", \B, 'C' ] into dst; other value kinds are skipped.
-func (p *quarkParser) listInto(dst *[]string) error {
+// dependenciesInto reads [ "a", \B, 'C' ] into q.Dependencies. Entries that are
+// not a dependency (a Quark(...) expression, say) are skipped and noted.
+func (p *quarkParser) dependenciesInto(q *QuarkFile) error {
 	if p.eof() || p.src[p.pos] != '[' {
 		return p.skipValue()
 	}
@@ -113,16 +115,27 @@ func (p *quarkParser) listInto(dst *[]string) error {
 			if err != nil {
 				return err
 			}
-			*dst = append(*dst, s)
+			q.addDependency(s)
 		case c == '\\':
 			p.pos++
-			*dst = append(*dst, p.word())
+			q.addDependency(p.word())
 		default:
+			start := p.pos
 			if err := p.skipValue(); err != nil {
 				return err
 			}
+			q.Notes = append(q.Notes, "dependency "+strings.TrimSpace(p.src[start:p.pos])+" is not a quark name or address and was skipped")
 		}
 	}
+}
+
+// addDependency stores a parsed dependency, or notes that it was skipped.
+func (q *QuarkFile) addDependency(raw string) {
+	if dep, ok := ParseDependency(raw); ok {
+		q.Dependencies = append(q.Dependencies, dep)
+		return
+	}
+	q.Notes = append(q.Notes, "dependency \""+raw+"\" is not a quark name or address and was skipped")
 }
 
 // skipValue skips to the next top-level "," or ")" without consuming it. A

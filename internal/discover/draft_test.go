@@ -71,7 +71,7 @@ func TestDraftUntagged(t *testing.T) {
 
 func TestDraftQuarkUsesQuarkFile(t *testing.T) {
 	scan := Scan{Kind: recipe.KindQuark, HasQuark: true, Quark: QuarkFile{
-		Name: "MyQuark", Summary: "From the quark", Dependencies: []string{"Other", "https://x.org/y.git", "Pinned@1.0"},
+		Name: "MyQuark", Summary: "From the quark", Dependencies: []Dependency{{Name: "Other"}, {Name: "y", URL: "https://x.org/y.git"}, {Name: "Pinned", Refspec: "1.0"}},
 	}}
 	r, _, err := DraftRecipe(url, pluginMeta, scan, head, nil)
 	if err != nil {
@@ -80,8 +80,9 @@ func TestDraftQuarkUsesQuarkFile(t *testing.T) {
 	if r.Name != "MyQuark" || r.Summary != "From the quark" || r.Build != nil {
 		t.Errorf("recipe = %+v", r)
 	}
-	if len(r.Depends) != 1 || r.Depends["Other"] == "" {
-		t.Errorf("depends = %v", r.Depends)
+	want := map[string]string{"Other": "*", "https://x.org/y.git": "*", "Pinned": "=1.0"}
+	if !reflect.DeepEqual(r.Depends, want) {
+		t.Errorf("depends = %v, want %v", r.Depends, want)
 	}
 }
 
@@ -141,7 +142,7 @@ func TestDraftWithDependsAndBuildSurvivesRoundTrip(t *testing.T) {
 	scan := Scan{
 		Kind: recipe.KindPluginQuark, HasQuark: true, CMakeDir: "src", SCPathVar: "SC_SRC_PATH",
 		Submodules: true, MentionsSupernova: true,
-		Quark: QuarkFile{Name: "Both", Summary: "s", Dependencies: []string{"Other", "More"}},
+		Quark: QuarkFile{Name: "Both", Summary: "s", Dependencies: []Dependency{{Name: "Other"}, {Name: "More"}}},
 	}
 	r, _, err := DraftRecipe(url, pluginMeta, scan, head, map[string]string{"Version-2.1": sha1, "Version-2.0": sha0})
 	if err != nil {
@@ -157,5 +158,31 @@ func TestDraftWithDependsAndBuildSurvivesRoundTrip(t *testing.T) {
 	}
 	if !reflect.DeepEqual(r, back) {
 		t.Errorf("round trip differs:\n%+v\n%+v\n%s", r, back, data)
+	}
+}
+
+func TestDraftDependsFormsAndNotes(t *testing.T) {
+	scan := Scan{Kind: recipe.KindQuark, HasQuark: true, Quark: QuarkFile{
+		Dependencies: []Dependency{
+			{Name: "Plain"},
+			{Name: "Repo", URL: "git://github.com/o/Repo.git", Refspec: "tags/v2.1"},
+			{Name: "Branchy", Refspec: "main"},
+			{Name: "Odd", URL: "ssh://host/odd"},
+		},
+		Notes: []string{"dependency Quark(\"x\") was skipped"},
+	}}
+	r, notes, err := DraftRecipe(url, pluginMeta, scan, head, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"Plain": "*", "https://github.com/o/Repo.git": "=2.1", "Branchy": "*"}
+	if !reflect.DeepEqual(r.Depends, want) {
+		t.Errorf("depends = %v, want %v", r.Depends, want)
+	}
+	text := strings.Join(notes, "\n")
+	for _, frag := range []string{"Quark(", "\"main\" is not a version", "ssh://host/odd"} {
+		if !strings.Contains(text, frag) {
+			t.Errorf("notes lack %q: %v", frag, notes)
+		}
 	}
 }
