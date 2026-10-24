@@ -1,0 +1,16 @@
+// Package config holds the constants that depend on where sc-deken is hosted.
+// Renaming the GitHub organization is a find-and-replace in this file.
+package config
+
+const (
+	// HelperName is the name of the Go helper executable.
+	HelperName = "scdeken"
+	// ToolRepo is the GitHub repository of the tool itself.
+	ToolRepo = "sc-deken/sc-deken"
+	// RecipesRepo is the GitHub repository holding recipes and advisories.
+	RecipesRepo = "sc-deken/sc-deken-recipes"
+	// DefaultIndexURL is where the package index is downloaded from.
+	DefaultIndexURL = "https://sc-deken.github.io/sc-deken-recipes/index.json"
+	// SCRepoURL is the SuperCollider source repository.
+	SCRepoURL = "https://github.com/supercollider/supercollider"
+)
