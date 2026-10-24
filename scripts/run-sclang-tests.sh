@@ -11,6 +11,7 @@
 #                     afterwards). Platform.userAppSupportDir, userExtensionDir
 #                     and userConfigDir are redirected into it.
 #   SCDEKEN_TIMEOUT   seconds before sclang is killed (default 120)
+#   (SCDEKEN_FIXTURES is set for the tests: built helper, signed test index, locks)
 #
 # Exit code: 0 all tests passed, 1 failures, 124 timeout, other = sclang error.
 set -euo pipefail
@@ -69,6 +70,9 @@ if [ "$#" -gt 0 ]; then tests=("$@")
 else mapfile -t tests < <(grep -rhoE '^Test[A-Za-z0-9_]* *:' "$repo/classes/tests" | tr -d ': ')
 fi
 
+# Helper, signed test index and bootstrap locks for the helper tests (task 28+).
+bash "$repo/scripts/make-sclang-fixtures.sh" "$profile/fixtures" "$profile" >&2
+export SCDEKEN_FIXTURES="$(native "$profile/fixtures")"
 export SCDEKEN_PROFILE="$(native "$profile")"
 export SCDEKEN_WATCHDOG=$(( ${SCDEKEN_TIMEOUT:-120} - 10 ))
 export LOCALAPPDATA="$(command -v cygpath >/dev/null && cygpath -w "$profile" || echo "$profile")" # belt and braces

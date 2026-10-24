@@ -10,13 +10,8 @@
 // Dictionary entries whose value is nil are dropped, so unknown fields are
 // simply absent from the JSON (the helper reads them as empty).
 DekenContext {
-	*write { |path, job|
-		var file = File(path, "w");
-		protect { file.write(DekenJSON.stringify(this.prCollect(job))) } { file.close };
-		^path
-	}
-
-	*prCollect { |job|
+	// The context as a Dictionary, for embedding in a request.
+	*build { |job|
 		^(
 			sc_version: Main.version,
 			sc_arch: Platform.architecture.asString,
@@ -28,6 +23,13 @@ DekenContext {
 			osc_port: NetAddr.langPort,
 			job: job
 		)
+	}
+
+	// Writes the context as JSON to path and returns path.
+	*write { |path, job|
+		var file = File(path, "w");
+		protect { file.write(DekenJSON.stringify(this.build(job))) } { file.close };
+		^path
 	}
 
 	*prQuark { |q|

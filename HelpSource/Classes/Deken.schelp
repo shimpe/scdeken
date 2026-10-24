@@ -1,0 +1,197 @@
+TITLE:: Deken
+summary:: Find, install, update and remove SuperCollider plugins and quarks
+categories:: Quarks
+related:: Classes/Quarks
+
+DESCRIPTION::
+Deken is a package manager for SuperCollider plugins (UGens) and quarks. It
+finds packages in a signed package list, installs prebuilt plugins (or builds
+them on this computer when there is no prebuilt version), and installs quarks
+for you.
+
+The work is done by a small helper program, code::scdeken::. The first time
+you use Deken it is downloaded, checked against a checksum that ships with the
+quark, and kept in the sc-deken folder inside link::Classes/Platform#*userAppSupportDir::.
+
+All methods are asynchronous. They return at once, the interpreter keeps
+running, and the result arrives later. Pass an code::action:: function to get the
+result; without one, a readable summary is posted.
+
+subsection:: The response
+code::action:: is called with an Event:
+
+definitionlist::
+## ok || true when it worked.
+## data || the answer, as parsed JSON: Dictionaries with String keys, Arrays, Strings, numbers, Booleans.
+## error || in plain words, when ok is false.
+## confirm || what still needs the user's OK: code::"unreviewed"::, code::"retracted":: or code::"duplicates"::.
+## needsConfirmation || true when an install is waiting for the user's answer (see link::#*install::).
+## after_install || after an install: code::"recompile":: and/or code::"reboot-server"::.
+## exit_code || the helper's exit code (0 ok, 1 error, 3 needs confirmation).
+::
+
+subsection:: What the helper may touch
+Plugin packages go into code::<user extension folder>/sc-deken/<name>::. Quarks are
+installed by SuperCollider itself (link::Classes/Quarks::). Nothing you own is deleted
+without asking: replaced copies are moved to a backup folder.
+
+CLASSMETHODS::
+
+private:: prSimple, prRequest, prLog, prProgress, prNeeded, prFindItem, prRemoveQuark, prInstallQuarks, prInstallQuark, prAfterInstall, prDefaultAction, prPostFailure, prPostSearch, prPostList, prPostInstall, prPostConfirmation
+
+subsection:: Finding packages
+
+METHOD:: platform
+Shows which computer, SuperCollider version and plugin API sc-deken sees. Prebuilt plugins are chosen by this.
+ARGUMENT:: action
+Function called with the response. code::data:: has code::os::, code::arch::, code::api::, code::sc_version:: and code::key::.
+code::
+Deken.platform;
+Deken.platform({ |r| r.data["key"].postln });
+::
+
+METHOD:: search
+Looks for packages by name, summary, UGen or class name.
+ARGUMENT:: query
+Text to look for.
+ARGUMENT:: kind
+code::nil:: for all, or code::"plugin"::, code::"quark"::, code::"plugin+quark"::.
+ARGUMENT:: includeUnreviewed
+Also list packages nobody has reviewed yet. Default false.
+ARGUMENT:: action
+Function called with the response. code::data:: is an Array of hits with code::name::, code::kind::, code::trust::, code::latest:: and code::summary::.
+code::
+Deken.search("pitch");
+Deken.search("fm", "plugin", action: { |r| r.data.do { |h| h["name"].postln } });
+::
+
+METHOD:: info
+Everything the package list knows about one package: versions, trust, dependencies and withdrawn versions.
+ARGUMENT:: name
+Package name.
+ARGUMENT:: action
+Function called with the response.
+code::
+Deken.info(\Panola);
+::
+
+METHOD:: list
+Packages installed on this computer (through sc-deken, as quarks, or by hand) with their versions.
+ARGUMENT:: action
+Function called with the response; code::data:: is an Array.
+code::
+Deken.list;
+::
+
+METHOD:: updates
+Like link::#*list::, but only what has a newer version.
+ARGUMENT:: action
+Function called with the response.
+code::
+Deken.updates;
+::
+
+METHOD:: doctor
+Checks the tools needed to build plugins on this computer (compiler, CMake, git). Give a package name to check what that package needs.
+ARGUMENT:: name
+Package name, or code::nil:: for the general check.
+ARGUMENT:: action
+Function called with the response.
+code::
+Deken.doctor;
+Deken.doctor(\fmx6);
+::
+
+METHOD:: refresh
+Downloads the package list again instead of using the saved copy.
+ARGUMENT:: action
+Function called with the response.
+code::
+Deken.refresh;
+::
+
+subsection:: Installing and removing
+
+METHOD:: install
+Installs a package and the packages it needs. Plugins are placed in the managed extension folder; quarks are installed by sclang. If something needs your OK first (an unreviewed package, a withdrawn version, an existing copy of the same plugin), nothing is installed. The action gets the plan with code::needsConfirmation:: true and code::confirm:: listing what is needed; the posted message shows the exact link::#*installConfirmed:: call to make if you agree.
+ARGUMENT:: name
+Package name.
+ARGUMENT:: version
+Version to install, or code::nil:: for the newest.
+ARGUMENT:: action
+Function called with the response.
+code::
+Deken.install(\Panola);
+Deken.install(\fmx6, nil, { |r|
+    if(r[\needsConfirmation] == true) { ("needs: " ++ r.confirm).postln } { r.ok.postln };
+});
+::
+
+METHOD:: installConfirmed
+Installs after you have answered the questions.
+ARGUMENT:: name
+Package name.
+ARGUMENT:: version
+Version, or code::nil:: for the newest.
+ARGUMENT:: choices
+An Event with your answers: code::confirm_unreviewed:: (true), code::confirm_retracted:: (true), code::on_duplicate:: (code::"replace":: or code::"keep"::).
+ARGUMENT:: action
+Function called with the response. When it finishes, a message says whether to recompile the class library and reboot the server.
+code::
+Deken.installConfirmed(\somePackage, nil, (confirm_unreviewed: true));
+::
+
+METHOD:: update
+Installs the newest version of a package. An installed quark is moved to the new version (with link::Classes/Quarks::); plugins are replaced and the old copy is kept in the backup folder.
+ARGUMENT:: name
+Package name.
+ARGUMENT:: action
+Function called with the response. Asks for confirmation like link::#*install::.
+code::
+Deken.update(\Panola);
+::
+
+METHOD:: remove
+Removes a package installed through sc-deken, or uninstalls a quark.
+ARGUMENT:: name
+Package name.
+ARGUMENT:: action
+Function called with the response.
+code::
+Deken.remove(\fmx6);
+::
+
+subsection:: Settings
+
+METHOD:: helperPath
+Developers: use this scdeken program instead of the downloaded one. code::nil:: (the default) downloads and checks the released helper.
+code::
+Deken.helperPath = "C:/dev/sc-deken/scdeken.exe";
+::
+
+METHOD:: indexURL
+Use another package list (address or code::file:///:: URL; a signature file with the same name plus code::.minisig:: must sit next to it and be made with a key listed in code::trusted-keys.txt::). code::nil:: uses the official list.
+code::
+Deken.indexURL = "file:///C:/test/index.json";
+::
+
+METHOD:: logAction
+A function called with each log line the helper sends while it works, instead of posting it. A graphical interface can show these.
+code::
+Deken.logAction = { |line| line.postln };
+::
+
+METHOD:: progressAction
+A function called with code::(fraction, label):: while the helper works (fraction goes from 0 to 1).
+code::
+Deken.progressAction = { |fraction, label| "% %".format(label, (fraction * 100).asInteger).postln };
+::
+
+EXAMPLES::
+code::
+// Find a package, then install it.
+Deken.search("fm");
+Deken.install(\fmx6);
+
+// Afterwards: Language > Recompile Class Library, then s.reboot.
+::
