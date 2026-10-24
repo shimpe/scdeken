@@ -129,6 +129,7 @@ func newEnv(t *testing.T, url string, k testKey) env {
 
 // expireSaved ages the saved package list past MaxAge, so the next Load must
 // ask the server. File times are too coarse for a tiny MaxAge to do this.
+// It requires a prior Load, so that a saved index exists.
 func (e env) expireSaved(t *testing.T) { e.setSavedTime(t, time.Now().Add(-2*defaultMaxAge)) }
 
 // setSavedTime sets the file time of the saved index, which Load reads as
@@ -287,8 +288,10 @@ func TestLoadAcceptsSameGeneratedTime(t *testing.T) {
 	srv := newServer(t, nil, nil)
 	srv.set(signed(t, k[0], indexJSON(t2, "")))
 	e := newEnv(t, srv.url(), k[0])
-	e.expireSaved(t)
 	for i := 0; i < 2; i++ {
+		if i == 1 {
+			e.expireSaved(t)
+		}
 		if err := e.load(); err != nil {
 			t.Fatal(err)
 		}
