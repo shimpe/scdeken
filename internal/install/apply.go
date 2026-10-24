@@ -56,24 +56,22 @@ func (s *Service) ApplyWith(ctx context.Context, p Plan, c Choices) (Result, err
 		return Result{}, &ConfirmationError{Needed: missing}
 	}
 	res := Result{Plan: p}
-	if p.Route == RouteQuark {
-		return res, nil // sclang runs Quarks.install
-	}
 	if c.OnDuplicate == "keep" && len(p.Duplicates) > 0 {
-		return s.keepExisting(res)
+		return s.keepExisting(res) // sclang installs no quark for a kept result
 	}
 	var dups []Duplicate
 	if c.OnDuplicate == "replace" {
 		dups = p.Duplicates
+	}
+	if p.Route == RouteQuark {
+		return s.clearForQuark(res, dups)
 	}
 	target, backups, err := s.install(ctx, p, dups)
 	if err != nil {
 		return res, err // install undoes its own work, so nothing is installed
 	}
 	res.InstalledTo = target
-	for _, b := range backups {
-		res.BackedUp = append(res.BackedUp, b.dst)
-	}
+	res.BackedUp = backupPaths(backups)
 	if err := s.record(p, target); err != nil {
 		return res, err // the files are in place even though state is not saved
 	}
@@ -118,6 +116,26 @@ func (s *Service) keepExisting(res Result) (Result, error) {
 	}
 	res.Kept = true
 	return res, nil
+}
+
+// clearForQuark moves the copies in dups to the backup folder. sclang then
+// installs the quark itself.
+func (s *Service) clearForQuark(res Result, dups []Duplicate) (Result, error) {
+	backups, err := s.backUp(dups)
+	if err != nil {
+		return res, err // backUp puts back what it moved
+	}
+	res.BackedUp = backupPaths(backups)
+	return res, nil
+}
+
+// backupPaths lists where the backed-up copies went.
+func backupPaths(backups []backup) []string {
+	var paths []string
+	for _, b := range backups {
+		paths = append(paths, b.dst)
+	}
+	return paths
 }
 
 // install fills a staging folder, moves dups out of the way and swaps the

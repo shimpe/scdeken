@@ -516,3 +516,47 @@ func TestApplyKeepsWhatAnotherProcessSaved(t *testing.T) {
 		t.Errorf("saved %+v (%v), in memory %+v", saved, err, s.State)
 	}
 }
+
+// quarkDuplicatePlan is a quark plan for Panola with a hand-made copy of it
+// in the extension folder.
+func quarkDuplicatePlan(t *testing.T, s *Service) (Plan, string) {
+	t.Helper()
+	dup := filepath.Join(s.Ctx.ExtensionDir, "Panola-by-hand")
+	writeTestFile(t, filepath.Join(dup, "Panola.sc"), "Panola {}")
+	p := Plan{
+		Package: "Panola", Version: "1.0.0", Commit: panolaCommit, Kind: recipe.KindQuark, Route: RouteQuark,
+		Quark:   &QuarkRef{URL: "https://github.com/example/Panola", Commit: panolaCommit},
+		Confirm: []string{ConfirmDuplicates}, Duplicates: []Duplicate{{Path: dup, Matched: "Panola"}},
+	}
+	return p, dup
+}
+
+func TestApplyQuarkKeepRecordsExternal(t *testing.T) {
+	s := applyService(t)
+	p, dup := quarkDuplicatePlan(t, s)
+	res, err := s.ApplyWith(context.Background(), p, Choices{OnDuplicate: "keep"})
+	if err != nil || !res.Kept {
+		t.Fatalf("res = %+v err = %v", res, err)
+	}
+	if e := s.State.Packages["panola"]; e.Route != state.External || e.Path != dup {
+		t.Errorf("entry = %+v", e)
+	}
+	if !exists(filepath.Join(dup, "Panola.sc")) {
+		t.Error("keep must not touch the copy")
+	}
+}
+
+func TestApplyQuarkReplaceBacksUpDuplicate(t *testing.T) {
+	s := applyService(t)
+	p, dup := quarkDuplicatePlan(t, s)
+	res, err := s.ApplyWith(context.Background(), p, Choices{OnDuplicate: "replace"})
+	if err != nil || res.Kept {
+		t.Fatalf("res = %+v err = %v", res, err)
+	}
+	if exists(dup) || len(res.BackedUp) != 1 || !exists(filepath.Join(res.BackedUp[0], "Panola.sc")) {
+		t.Errorf("copy not moved to a backup: %+v", res)
+	}
+	if res.InstalledTo != "" || len(s.State.Packages) != 0 {
+		t.Error("the quark itself is installed by SuperCollider, not recorded here")
+	}
+}
