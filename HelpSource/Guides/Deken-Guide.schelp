@@ -1,0 +1,161 @@
+TITLE:: Deken Guide
+summary:: Find, install, update and remove SuperCollider plugins and quarks with Deken
+categories:: Guides, Quarks
+related:: Classes/Deken, Classes/DekenGui, Classes/Quarks
+
+Deken is a package manager for SuperCollider plugins (UGens) and quarks. This guide is for people who make music with SuperCollider and want to use what other people wrote. You do not need to know what a compiler is. The same text, with more pictures, is on the web: link::https://github.com/shimpe/scdeken/blob/main/docs/user-guide.md::.
+
+The pictures were taken on Windows with SuperCollider 3.14.1; the package list in them is a test list, so versions and star counts are only examples.
+
+SECTION:: What Deken does
+There are two kinds of add-ons for SuperCollider:
+
+list::
+## strong::Plugins:: (also called UGens) are small programs that make the sound server do something new, such as a new oscillator or filter. Most are published as source code and have to be compiled before SuperCollider can use them.
+## strong::Quarks:: are collections of SuperCollider code (classes and help files). SuperCollider can install them itself.
+::
+
+Deken gives you one window for both. It keeps a searchable list of packages. For many plugins there is a ready-made download for your computer, made by an automatic build and checked before it reaches you. When there is none, Deken builds the plugin on your computer and tells you exactly which tools are missing, if any.
+
+SECTION:: Install Deken
+Run these two lines (select them and press Ctrl+Enter, or Cmd+Enter on a Mac), then open the window:
+
+code::
+Quarks.install("https://github.com/shimpe/scdeken");
+thisProcess.recompile;
+
+// after the class library has recompiled:
+Deken.gui;
+::
+
+The first time, Deken downloads a small helper program (code::scdeken::) and checks it against a checksum that came with the quark. The window opens at once; the package list appears when the helper is ready. SuperCollider 3.13 or newer is needed, and an internet connection for the first start.
+
+SECTION:: The window
+image::images/01-browse.png#The Browse page::
+
+list::
+## strong::Left:: the pages. Browse lists all packages, Installed lists what is on your computer, Updates lists installed packages that have a newer version, Build log shows what Deken is doing while it works, and Settings.
+## strong::Middle:: a search box, filter buttons (All, Plugins, Quarks, Plugin + Quark) and the list. Every row has the type, the name, a one-line summary and a status.
+## strong::Right:: details of the selected package: what is inside, what you have to do afterwards, which version you get, and the buttons.
+## strong::Bottom:: what Deken knows about your computer, for example "Windows x86_64 - plugin API 3 - scsynth+supernova". Prebuilt plugins are chosen by this.
+::
+
+Nothing in the window makes SuperCollider wait. While a package is being installed its row says "working..." and its buttons are off.
+
+SECTION:: Find a package
+Type in the search box. Deken looks at the package name, the summary and the names of the UGens and classes inside the package, so you can search for a sound ("fm", "reverb") or for a UGen name you saw in someone's code.
+
+image::images/02-search.png#Searching for fm: fmx6 and nome6 match by name and summary, sc3-plugins because it contains the UGen FM7::
+
+Use the filter buttons to show only plugins, only quarks, or only packages that are both. Tick Show unreviewed to include packages that were found automatically and that nobody has looked at yet.
+
+SECTION:: What the labels mean
+SUBSECTION:: Type
+table::
+## PLUGIN || A compiled plugin for the sound server, with the small class files that let you use it in code.
+## QUARK || SuperCollider code only (classes, help). Nothing is compiled.
+## PLUGIN + QUARK || A compiled plugin plus a larger library of SuperCollider code.
+::
+
+SUBSECTION:: Status
+table::
+## reviewed - prebuilt || A maintainer reviewed this exact version, and there is a ready-made download for your computer.
+## reviewed - build locally || Reviewed, but no download for your computer: Deken builds it here.
+## community-listed || A quark from SuperCollider's official quarks list.
+## unreviewed || Found automatically. Nobody has looked at it.
+## update available || You have it, and a newer version exists.
+## retracted (red) || Withdrawn because of malware, a serious problem or a dangerous bug.
+## working... || An install, update or removal is running.
+::
+
+SECTION:: Install a package
+Select a package and press Install. A reviewed plugin with a prebuilt download is downloaded, checked against the signed package list and unpacked into the sc-deken folder inside your extensions folder. Quarks are installed by SuperCollider itself, as if you had used code::Quarks.install::, and some quarks need other quarks: the details pane lists them and Deken installs them first.
+
+When it is done a window tells you what to do next:
+
+list::
+## strong::Recompile the class library:: (Language > Recompile Class Library) so SuperCollider sees the new classes and help.
+## strong::Reboot the sound server:: (code::s.reboot::) after installing a plugin, so the server loads the new UGens.
+::
+
+The Version box lists the versions that are available; the newest is chosen.
+
+SECTION:: When a package has to be built on your computer
+Some plugins have no ready-made download for your computer. The status says "reviewed - build locally".
+
+image::images/03-local-build.png#A plugin that will be built on this computer::
+
+Building needs three tools that are not part of SuperCollider: strong::Git:: (to fetch the source code), strong::CMake:: (to prepare the build) and a strong::C++ compiler:: (on Windows the Build Tools for Visual Studio with the C++ workload, on macOS the Xcode command line tools, on Linux g++ or clang++).
+
+Before it builds, Deken checks that you have them. If something is missing it stops and says what, with the command that installs it. Copy the command, run it in a terminal, then press Check again.
+
+image::images/dialog-doctor.png#CMake is missing, with the command that installs it::
+
+The first build also downloads the SuperCollider source that matches your version (one time; it is kept). Everything the build prints goes to the Build log page.
+
+SECTION:: Unreviewed packages
+Unreviewed packages have no prebuilt downloads, so installing one means building code nobody has looked at. Deken asks you to confirm first, and says where the code comes from and which exact version will be used. A plugin runs with all your rights, like any program: only go on if you trust the author. Cancel is the default button, and nothing is installed before you agree.
+
+SECTION:: A copy is already on your computer
+If you put a plugin into your extensions folder by hand earlier, a second copy would cause "duplicate class" errors. Deken looks for existing copies and asks: Replace moves the old copy to a backup folder (it is never deleted) and installs the new one; Keep existing stops and leaves your copy as it is.
+
+SECTION:: Update and remove
+The Installed page lists everything on your computer, including quarks you installed the old way.
+
+image::images/07-installed.png#The Installed page; portedplugins has an update waiting::
+
+Press Update to install the newest version. The old version stays in place until the new one is ready, and comes back if the update fails. Press Remove to take a package off your computer (you are asked first). Removal deletes the plugin's folder, or uninstalls the quark.
+
+SECTION:: Withdrawn packages
+Sometimes a package turns out to be a problem: it contains malware, a serious security hole, or a bug that can crash your computer or lose your work. The maintainers can withdraw it. A withdrawn version is shown in red as "retracted". For malware the install is refused; for a serious vulnerability or a dangerous bug you can still install it after a warning.
+
+When you start SuperCollider, Deken quietly checks whether anything you have installed was withdrawn. If so, a window tells you which package, why, and where it is on your computer. Offline, the check is skipped without a word.
+
+image::images/advisory-malware.png#A package on your computer was withdrawn::
+
+You decide what happens. strong::Nothing is removed without your permission.::
+
+list::
+## strong::Remove now:: moves the package to a quarantine folder outside the places SuperCollider loads from. Nothing is deleted, so a false alarm costs you nothing. Afterwards you are asked to recompile the class library (and reboot the server for plugins).
+## strong::Update to x.y.z:: appears when a fixed version exists.
+## strong::Keep:: leaves the package alone and remembers your choice. For malware you are asked a second time.
+## strong::Remind me later:: does nothing now and asks again next time.
+::
+
+Removing malware stops it from running again, but it cannot undo what it already did while SuperCollider was running. The details link in the window says what the problem was. Quarantined packages stay on disk until you delete them yourself in Settings.
+
+SECTION:: Settings
+list::
+## Check installed packages for withdrawn versions when the window opens (on by default).
+## Show unreviewed packages in Browse by default (off by default).
+## Use this scdeken program instead of the downloaded one: for developers; leave it empty.
+## Delete quarantined packages... removes quarantined packages for good, after asking.
+## Refresh package list downloads the list again. Deken does this by itself at most once an hour.
+::
+
+SECTION:: Using Deken from code
+Everything in the window can be done from code. Calls return at once; the result is posted when it is ready. See link::Classes/Deken:: for all methods.
+
+code::
+Deken.search("fm");              // list matching packages
+Deken.info(\Panola);             // versions, trust, withdrawn versions
+Deken.install(\Panola);          // a quark
+Deken.install(\portedplugins);   // a plugin
+Deken.install(\portedplugins, "0.4.1");   // a specific version
+Deken.update(\portedplugins);
+Deken.remove(\portedplugins);
+Deken.list;                      // what is installed
+Deken.doctor;                    // are the build tools there?
+::
+
+SECTION:: Troubleshooting
+definitionlist::
+## "Can't update/remove X while SuperCollider is using it. Quit the server (s.quit) and try again." (Windows) || Windows will not let a program replace a plugin file that the sound server has loaded. Run code::s.quit::, repeat the update or removal, then code::s.boot:: again.
+## The new UGen is not found || Recompile the class library and reboot the server (code::s.reboot::). Both are needed after installing a plugin.
+## "No package list yet" || The list has never been downloaded on this computer. Connect to the internet, then press Refresh package list in Settings.
+## Working offline || After the list has been downloaded once, search and browsing use the saved, signed copy and work without internet. Installing a prebuilt plugin, building from source and the withdrawn-package check need a connection.
+## The package list could not be verified || Deken refuses a list whose signature does not match and keeps using the last good copy. If it persists, update Deken with code::Quarks.update("Deken");:: and recompile.
+## Tools are missing for a local build || Install what the dialog names and press Check again. If a tool is installed but not found, restart SuperCollider so it sees the updated PATH.
+## A build fails || Open the Build log page and read the last lines. Copy the log when you ask the package's author for help, and mention the platform line from the bottom of the window.
+## Where are my files? || Plugins installed by Deken are in code::Platform.userExtensionDir +/+ "sc-deken":: (one folder per package). The backup and quarantine folders are in code::Platform.userAppSupportDir +/+ "sc-deken"::.
+::

@@ -116,3 +116,6 @@ write_lock "$fx/lock-ok.json" "$(echo "$exe_sha" | tr a-f A-F)" # also proves th
 write_lock "$fx/lock-bad.json" "$(printf '0%.0s' $(seq 64))"
 
 echo "$(native "$helper")" > "$fx/helper-path.txt"
+
+# The package list the documentation screenshots use (see scripts/gui-screenshots.scd).
+bash "$repo/scripts/make-doc-index.sh" "$fx"

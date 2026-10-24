@@ -1,13 +1,15 @@
 TITLE:: Deken
 summary:: Find, install, update and remove SuperCollider plugins and quarks
 categories:: Quarks
-related:: Classes/Quarks
+related:: Guides/Deken-Guide, Classes/DekenGui, Classes/Quarks
 
 DESCRIPTION::
 Deken is a package manager for SuperCollider plugins (UGens) and quarks. It
 finds packages in a signed package list, installs prebuilt plugins (or builds
 them on this computer when there is no prebuilt version), and installs quarks
 for you.
+
+For a walk through the window with pictures, see link::Guides/Deken-Guide::.
 
 The work is done by a small helper program, code::scdeken::. The first time
 you use Deken it is downloaded, checked against a checksum that ships with the

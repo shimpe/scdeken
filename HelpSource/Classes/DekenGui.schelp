@@ -1,7 +1,7 @@
 TITLE:: DekenGui
 summary:: The package manager window
 categories:: Quarks
-related:: Classes/Deken
+related:: Guides/Deken-Guide, Classes/Deken
 
 DESCRIPTION::
 The window opened by code::Deken.gui::. On the left: Browse, Installed, Updates, Build log and Settings. The list shows, for every package, its type (PLUGIN, QUARK or PLUGIN + QUARK), name, a one-line summary, a status badge and, for hits found in code, a note such as "matched UGen: FM7". Select a package to see what it contains, which version you get and how it will be installed.
