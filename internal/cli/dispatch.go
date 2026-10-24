@@ -65,13 +65,15 @@ var commands = map[string]command{
 	"plan": {usage: "plan <package>[@version]", args: onePackage, run: runPlan},
 	"install": {
 		usage: "install <package>[@version] [--yes-unreviewed] [--yes-retracted] [--on-duplicate replace|keep]",
-		flags: func(fs *flag.FlagSet, req *Request) {
-			fs.BoolVar(&req.Choices.ConfirmUnreviewed, "yes-unreviewed", false, "install a package nobody has reviewed")
-			fs.BoolVar(&req.Choices.ConfirmRetracted, "yes-retracted", false, "install a version that was withdrawn")
-			fs.StringVar(&req.Choices.OnDuplicate, "on-duplicate", "", "replace or keep a copy that is already installed")
-		},
-		args: onePackage,
-		run:  runInstall,
+		flags: choiceFlags,
+		args:  onePackage,
+		run:   runInstall,
+	},
+	"update": {
+		usage: "update [<package>] [--yes-unreviewed] [--yes-retracted] [--on-duplicate replace|keep]",
+		flags: choiceFlags,
+		args:  optionalPackage,
+		run:   runUpdate,
 	},
 	"remove":           {usage: "remove <package>", args: onePackage, run: runRemove},
 	"list":             {usage: "list", args: noArgs, run: runList},
@@ -170,4 +172,12 @@ func optionalPackage(pos []string, req *Request) error {
 		return nil
 	}
 	return onePackage(pos, req)
+}
+
+// choiceFlags are the answers to a plan's confirmations, for install and
+// update.
+func choiceFlags(fs *flag.FlagSet, req *Request) {
+	fs.BoolVar(&req.Choices.ConfirmUnreviewed, "yes-unreviewed", false, "install a package nobody has reviewed")
+	fs.BoolVar(&req.Choices.ConfirmRetracted, "yes-retracted", false, "install a version that was withdrawn")
+	fs.StringVar(&req.Choices.OnDuplicate, "on-duplicate", "", "replace or keep a copy that is already installed")
 }

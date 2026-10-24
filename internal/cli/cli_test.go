@@ -18,11 +18,13 @@ import (
 
 	"github.com/shimpe/scdeken/internal/archive"
 	"github.com/shimpe/scdeken/internal/index"
+	"github.com/shimpe/scdeken/internal/install"
 	"github.com/shimpe/scdeken/internal/platform"
 	"github.com/shimpe/scdeken/internal/recipe"
 	"github.com/shimpe/scdeken/internal/run"
 	"github.com/shimpe/scdeken/internal/scenv"
 	"github.com/shimpe/scdeken/internal/sign"
+	"github.com/shimpe/scdeken/internal/state"
 )
 
 const password = "test-password"
@@ -422,5 +424,117 @@ func TestInstallQuarkWithURLDependencyNeedsConfirmation(t *testing.T) {
 	}
 	if conf, _ := dep["confirm"].([]any); len(conf) != 1 || conf[0] != "unreviewed" {
 		t.Errorf("dependency confirm = %v", dep["confirm"])
+	}
+}
+
+// runRequest sends req through a request file, as SuperCollider does, and
+// returns the exit code and the response.
+func (w *world) runRequest(t *testing.T, req Request) (int, Response) {
+	t.Helper()
+	req.IndexURL, req.Context = w.url, w.ctx
+	reqPath, resPath := filepath.Join(w.dir, "request.json"), filepath.Join(w.dir, "result.json")
+	data, _ := json.Marshal(req)
+	if err := os.WriteFile(reqPath, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, _, errs := w.call(t, "run", reqPath, resPath)
+	got, err := os.ReadFile(resPath)
+	if err != nil {
+		t.Fatalf("no result (exit %d, stderr %s): %v", code, errs, err)
+	}
+	return code, decode(t, string(got))
+}
+
+const changedMessage = "The package list changed since you confirmed; please check again."
+
+func TestInstallWithTheConfirmedCommits(t *testing.T) {
+	w := newWorld(t)
+	choices := install.Choices{Commits: map[string]string{"fmx6": strings.Repeat("2", 40)}}
+	if code, r := w.runRequest(t, Request{Command: "install", Package: "fmx6", Choices: choices}); code != 0 || !r.OK {
+		t.Fatalf("exit %d, response %+v", code, r)
+	}
+}
+
+func TestInstallRefusesAChangedCommit(t *testing.T) {
+	w := newWorld(t)
+	choices := install.Choices{ConfirmUnreviewed: true, Commits: map[string]string{"wild": strings.Repeat("9", 40)}}
+	code, r := w.runRequest(t, Request{Command: "install", Package: "wild", Choices: choices})
+	plan, _ := r.Data.(map[string]any)
+	if code != 3 || !reflect.DeepEqual(r.Confirm, []string{"changed"}) || r.Error != changedMessage || plan["package"] != "wild" {
+		t.Fatalf("exit %d, response %+v", code, r)
+	}
+	if !nothingInstalled(w) {
+		t.Error("something was installed")
+	}
+}
+
+// A dependency the user never saw makes the plan a different one too.
+func TestInstallRefusesAnUnconfirmedPackage(t *testing.T) {
+	w := newWorld(t)
+	choices := install.Choices{ConfirmUnreviewed: true, Commits: map[string]string{"risky-app": strings.Repeat("3", 40)}}
+	code, r := w.runRequest(t, Request{Command: "install", Package: "risky-app", Choices: choices})
+	if code != 3 || !reflect.DeepEqual(r.Confirm, []string{"changed"}) {
+		t.Fatalf("exit %d, response %+v", code, r)
+	}
+}
+
+func TestInstallChangedAndUnconfirmed(t *testing.T) {
+	w := newWorld(t)
+	choices := install.Choices{Commits: map[string]string{"wild": strings.Repeat("9", 40)}}
+	code, r := w.runRequest(t, Request{Command: "install", Package: "wild", Choices: choices})
+	if code != 3 || !reflect.DeepEqual(r.Confirm, []string{"unreviewed", "changed"}) {
+		t.Fatalf("exit %d, response %+v", code, r)
+	}
+}
+
+// installedBefore records packages as installed by sc-deken at version 0.9.0,
+// older than the 1.0.0 the index offers.
+func (w *world) installedBefore(t *testing.T, names ...string) {
+	t.Helper()
+	st := &state.State{Packages: map[string]state.Entry{}}
+	for _, name := range names {
+		dir := filepath.Join(w.ctx.ExtensionDir, "sc-deken", name)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		st.Packages[name] = state.Entry{Name: name, Version: "0.9.0", Kind: "plugin", Path: dir, Route: state.Prebuilt}
+	}
+	if err := st.Save(w.ctx.Paths().State); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestUpdateEverything(t *testing.T) {
+	w := newWorld(t)
+	w.installedBefore(t, "fmx6")
+	code, out, errs := w.call(t, "update")
+	results, _ := decode(t, out).Data.(map[string]any)["results"].([]any)
+	if code != 0 || len(results) != 1 {
+		t.Fatalf("exit %d, results %v, stderr %s", code, results, errs)
+	}
+	if _, err := os.Stat(filepath.Join(w.ctx.ExtensionDir, "sc-deken", "fmx6", "FMX6.scx")); err != nil {
+		t.Errorf("not updated: %v", err)
+	}
+}
+
+func TestUpdateEverythingAsksFirst(t *testing.T) {
+	w := newWorld(t)
+	w.installedBefore(t, "fmx6", "wild")
+	code, out, _ := w.call(t, "update")
+	r := decode(t, out)
+	plans, _ := r.Data.(map[string]any)["plans"].([]any)
+	if code != 3 || !reflect.DeepEqual(r.Confirm, []string{"unreviewed"}) || len(plans) != 2 {
+		t.Fatalf("exit %d, response %+v", code, r)
+	}
+	if _, err := os.Stat(filepath.Join(w.ctx.ExtensionDir, "sc-deken", "fmx6", "FMX6.scx")); !os.IsNotExist(err) {
+		t.Error("fmx6 was updated before the user answered for wild")
+	}
+}
+
+func TestUpdateOnePackage(t *testing.T) {
+	w := newWorld(t)
+	w.installedBefore(t, "fmx6", "wild")
+	if code, _, errs := w.call(t, "update", "fmx6"); code != 0 {
+		t.Fatalf("exit %d, stderr %s", code, errs)
 	}
 }

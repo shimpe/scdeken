@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/shimpe/scdeken/internal/doctor"
@@ -120,8 +121,8 @@ func runPlan(ctx context.Context, req Request, s *session) (any, error) {
 	return svc.Plan(ctx, req.Package, req.Version)
 }
 
-// installed is the answer to "install": one result per package, the
-// dependencies first and the requested package last.
+// installed is the answer to "install" and "update": one result per
+// package, each dependency before the package that needs it.
 type installed struct {
 	Results []install.Result `json:"results"`
 }
@@ -129,6 +130,9 @@ type installed struct {
 func runInstall(ctx context.Context, req Request, s *session) (any, error) {
 	if req.Package == "" {
 		return nil, usageError{"install needs a package name"}
+	}
+	if err := req.Choices.Validate(); err != nil {
+		return nil, err
 	}
 	svc, err := s.serviceWithIndex(ctx)
 	if err != nil {
@@ -139,15 +143,81 @@ func runInstall(ctx context.Context, req Request, s *session) (any, error) {
 		return nil, err
 	}
 	plans := append(append([]install.Plan{}, plan.Depends...), plan)
+	if err := checkConfirmed(plans, req.Choices); err != nil {
+		return plan, err
+	}
+	return applyAll(ctx, svc, plans, req.Choices)
+}
+
+// updatePlans is what "update" without a package answers when the user has
+// to confirm something first: every plan, in install order.
+type updatePlans struct {
+	Plans []install.Plan `json:"plans"`
+}
+
+// runUpdate installs the newest version of one package, or of every
+// package that has an update. Nothing is installed before the user has
+// answered for all of them.
+func runUpdate(ctx context.Context, req Request, s *session) (any, error) {
+	if req.Package != "" {
+		return runInstall(ctx, req, s)
+	}
 	if err := req.Choices.Validate(); err != nil {
 		return nil, err
 	}
-	if missing := missingAcross(plans, req.Choices); len(missing) > 0 {
-		return plan, &install.ConfirmationError{Needed: missing}
+	svc, err := s.serviceWithIndex(ctx)
+	if err != nil {
+		return nil, err
 	}
+	plans, err := planUpdates(ctx, svc)
+	if err != nil {
+		return nil, err
+	}
+	if err := checkConfirmed(plans, req.Choices); err != nil {
+		return updatePlans{Plans: plans}, err
+	}
+	return applyAll(ctx, svc, plans, req.Choices)
+}
+
+// planUpdates plans the newest version of every package that has an
+// update, each package once and its dependencies first.
+func planUpdates(ctx context.Context, svc *install.Service) ([]install.Plan, error) {
+	plans := []install.Plan{}
+	seen := map[string]bool{}
+	for _, it := range svc.Updates() {
+		plan, err := svc.Plan(ctx, it.Name, "")
+		if err != nil {
+			return nil, err
+		}
+		for _, p := range append(append([]install.Plan{}, plan.Depends...), plan) {
+			if key := strings.ToLower(p.Package); !seen[key] {
+				seen[key] = true
+				plans = append(plans, p)
+			}
+		}
+	}
+	return plans, nil
+}
+
+// checkConfirmed returns a ConfirmationError when the choices leave a
+// confirmation open on any of the plans, or were given for other plans
+// than these (the package list changed since the user looked).
+func checkConfirmed(plans []install.Plan, c install.Choices) error {
+	missing := missingAcross(plans, c)
+	if !c.Confirmed(plans) {
+		return &install.ConfirmationError{Needed: append(missing, install.ConfirmChanged), Message: install.ChangedMessage}
+	}
+	if len(missing) > 0 {
+		return &install.ConfirmationError{Needed: missing}
+	}
+	return nil
+}
+
+// applyAll installs the plans in order and stops at the first failure.
+func applyAll(ctx context.Context, svc *install.Service, plans []install.Plan, c install.Choices) (any, error) {
 	out := installed{Results: []install.Result{}}
 	for _, p := range plans {
-		res, err := svc.ApplyWith(ctx, p, req.Choices)
+		res, err := svc.ApplyWith(ctx, p, c)
 		if err != nil {
 			return nil, err
 		}

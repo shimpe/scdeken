@@ -24,13 +24,41 @@ type Choices struct {
 	ConfirmUnreviewed bool   `json:"confirm_unreviewed"`
 	ConfirmRetracted  bool   `json:"confirm_retracted"`
 	OnDuplicate       string `json:"on_duplicate"` // "replace" | "keep" | ""
+	// Commits ties the answers to the plan the user saw: package name ->
+	// commit shown. Empty when the user typed the answers without seeing a
+	// plan (command-line flags).
+	Commits map[string]string `json:"commits,omitempty"`
 }
 
+// ChangedMessage explains a ConfirmChanged confirmation.
+const ChangedMessage = "The package list changed since you confirmed; please check again."
+
 // ConfirmationError lists the confirmations still missing.
-type ConfirmationError struct{ Needed []string }
+type ConfirmationError struct {
+	Needed  []string
+	Message string // optional plain-words explanation
+}
 
 func (e *ConfirmationError) Error() string {
+	if e.Message != "" {
+		return e.Message
+	}
 	return "needs confirmation: " + strings.Join(e.Needed, ", ")
+}
+
+// Confirmed reports whether the user saw exactly these plans: every one of
+// them installs the commit the choices name for it. Choices without commits
+// confirm whatever is planned.
+func (c Choices) Confirmed(plans []Plan) bool {
+	if len(c.Commits) == 0 {
+		return true
+	}
+	for _, p := range plans {
+		if seen, ok := c.Commits[p.Package]; !ok || seen != p.Commit {
+			return false
+		}
+	}
+	return true
 }
 
 // Result is what Apply did.

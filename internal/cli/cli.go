@@ -27,7 +27,7 @@ func Main(args []string, stdout, stderr io.Writer) int {
 const usageText = `usage: scdeken [--context <file>] [--offline] [--index-url <url>] <command> [arguments]
 
 commands:
-  platform | search | info | plan | install | remove | list | updates
+  platform | search | info | plan | install | update | remove | list | updates
   doctor | advisories check | advisories keep | quarantine | refresh | version
   recipe new <github-url> [--out <file>]
   recipe check <file> [--build] [--sc-version 3.14.1]

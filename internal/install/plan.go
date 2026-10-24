@@ -28,6 +28,7 @@ const (
 	ConfirmUnreviewed = "unreviewed"
 	ConfirmRetracted  = "retracted"
 	ConfirmDuplicates = "duplicates"
+	ConfirmChanged    = "changed" // the plan is not the one the user confirmed
 )
 
 // Steps that must happen after the files are in place.
