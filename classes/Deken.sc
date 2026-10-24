@@ -50,6 +50,26 @@ Deken {
 		this.prSimple((command: "refresh"), action, "refresh")
 	}
 
+	// Plans an install without doing it: data is the plan (route, doctor, confirm, depends).
+	*plan { |name, version, action|
+		this.prSimple((command: "plan", package: name.asString, version: version), action, "plan")
+	}
+
+	// Installed packages that an advisory has withdrawn.
+	*advisories { |action|
+		this.prSimple((command: "advisories-check"), action, "advisories")
+	}
+
+	// Permanently deletes the packages in quarantine.
+	*quarantineClear { |action|
+		this.prSimple((command: "quarantine-clear"), action, "quarantine-clear")
+	}
+
+	// Opens the package manager window.
+	*gui {
+		^DekenGui.new.front
+	}
+
 	// ---- installing
 
 	// Plans the install. If something needs the user's OK, action gets the

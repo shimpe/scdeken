@@ -1,0 +1,25 @@
+TITLE:: DekenGui
+summary:: The package manager window
+categories:: Quarks
+related:: Classes/Deken
+
+DESCRIPTION::
+The window opened by code::Deken.gui::. On the left: Browse, Installed, Updates, Build log and Settings. The list shows, for every package, its type (PLUGIN, QUARK or PLUGIN + QUARK), name, a one-line summary, a status badge and, for hits found in code, a note such as "matched UGen: FM7". Select a package to see what it contains, which version you get and how it will be installed.
+
+Nothing in the window waits for the helper: a package that is being installed shows "working…" and its buttons are off until it is done. The Build log page shows what the helper reports, with a header for each job.
+
+Questions that need your OK (an unreviewed package, a withdrawn version, a copy that is already installed) are asked in one window that lists the package and everything it needs. Cancel is always the default.
+
+Settings are saved in code::sc-deken/settings.scd:: inside link::Classes/Platform#*userAppSupportDir::.
+
+CLASSMETHODS::
+METHOD:: new
+Opens the window. Same as link::Classes/Deken#*gui::.
+
+private:: initClass, columnWidths
+
+INSTANCEMETHODS::
+METHOD:: front
+Brings the window to the front.
+
+private:: init, window, sidebar, details, search, kindButtons, unreviewedBox, tree, rows, installed, prStart, prThen, prShowPlatform, prEngines, prLoadCatalog, prCheckAdvisories, prBuildWindow, prListPage, prLogPage, prSettingsPage, prSidebarItems, prUpdateCounts, prFitColumns, prShowPage, prPickKind, prSearchSoon, prRefreshList, prSearch, prRowFromHit, prInstalledRows, prRowFromInstalled, prKnown, prShowRows, prAddItem, prColorStatus, prStatusOf, prRefreshStatus, prSelect, prShowRow, prPlanSelected, prRememberRoute, prInstall, prRun, prInstallResult, prConfirm, prAskRemove, prAskClearQuarantine, prRefreshPackages, prSetBusy, prReloadInstalled, prMarkInstalledRows, prFailed

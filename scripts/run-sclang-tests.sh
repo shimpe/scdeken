@@ -11,6 +11,8 @@
 #                     afterwards). Platform.userAppSupportDir, userExtensionDir
 #                     and userConfigDir are redirected into it.
 #   SCDEKEN_TIMEOUT   seconds before sclang is killed (default 120)
+#   SCDEKEN_SCRIPT    run this .scd instead of the test runner (scripts/gui-screenshots.scd);
+#                     it gets the same sandbox, fixtures and SCDEKEN_* variables
 #   (SCDEKEN_FIXTURES is set for the tests: built helper, signed test index, locks)
 #
 # Exit code: 0 all tests passed, 1 failures, 124 timeout, other = sclang error.
@@ -78,6 +80,6 @@ export SCDEKEN_WATCHDOG=$(( ${SCDEKEN_TIMEOUT:-120} - 10 ))
 export LOCALAPPDATA="$(command -v cygpath >/dev/null && cygpath -w "$profile" || echo "$profile")" # belt and braces
 set +e
 timeout "${SCDEKEN_TIMEOUT:-120}" "$sclang" -l "$(native "$profile/sclang_conf.yaml")" \
-	"$(native "$profile/run.scd")" "${tests[@]}" </dev/null 2>&1 | tee "$profile/last-run.log"
+	"$(native "${SCDEKEN_SCRIPT:-$profile/run.scd}")" "${tests[@]}" </dev/null 2>&1 | tee "$profile/last-run.log"
 rc=${PIPESTATUS[0]}
 exit "$rc"

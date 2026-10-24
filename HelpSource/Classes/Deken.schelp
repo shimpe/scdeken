@@ -110,6 +110,31 @@ code::
 Deken.refresh;
 ::
 
+METHOD:: plan
+Works out how a package would be installed (prebuilt, built here, or as a quark), and what would need your OK, without installing anything.
+ARGUMENT:: name
+Package name.
+ARGUMENT:: version
+Version, or code::nil:: for the newest.
+ARGUMENT:: action
+Function called with the response; code::data:: is the plan.
+
+METHOD:: advisories
+Lists installed packages that a security notice has withdrawn.
+ARGUMENT:: action
+Function called with the response; code::data:: is an Array.
+
+METHOD:: quarantineClear
+Permanently deletes the packages that were put in quarantine. Ask first: this cannot be undone.
+ARGUMENT:: action
+Function called with the response.
+
+METHOD:: gui
+Opens the package manager window: browse and search with the type and one-line summary of each package, see what is installed, what has updates, the build log, and the settings. See link::Classes/DekenGui::.
+code::
+Deken.gui;
+::
+
 subsection:: Installing and removing
 
 METHOD:: install
