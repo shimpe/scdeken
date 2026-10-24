@@ -109,6 +109,12 @@ func (v Version) IsUnstable() bool { return v.build }
 // String returns the version as written, without a leading "v".
 func (v Version) String() string { return v.text }
 
+// Major returns the first numeric part of the version.
+func (v Version) Major() int { return v.core[0] }
+
+// Minor returns the second numeric part of the version.
+func (v Version) Minor() int { return v.core[1] }
+
 // Compare returns -1, 0 or 1 by semantic version precedence. Build metadata is
 // ignored, and a prerelease sorts below its release.
 func (v Version) Compare(o Version) int {

@@ -105,3 +105,14 @@ func TestMax(t *testing.T) {
 		t.Error("Max(nil) must report false")
 	}
 }
+
+func TestMajorMinor(t *testing.T) {
+	v := mustParse(t, "3.15.0-dev")
+	if v.Major() != 3 || v.Minor() != 15 {
+		t.Errorf("Major, Minor = %d, %d; want 3, 15", v.Major(), v.Minor())
+	}
+	v = mustParse(t, "7")
+	if v.Major() != 7 || v.Minor() != 0 {
+		t.Errorf("Major, Minor = %d, %d; want 7, 0", v.Major(), v.Minor())
+	}
+}
