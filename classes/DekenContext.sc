@@ -4,9 +4,9 @@
 //
 // Quark API verified on SuperCollider 3.14.1: Quarks.installed lists a Quark
 // for every LanguageConfig.includePaths entry (so the class library folder
-// shows up too). Quark has name, url (nil if unknown), localPath, and git
-// (a Git, or nil when the folder is not a git checkout); Git:sha runs
-// `git rev-parse HEAD`. A quark without git, or a failing git, gives no commit.
+// shows up too). Quark has name and localPath. Url and commit come from the
+// .git files via DekenGit, never by starting git (Quark:url and Git:sha run
+// processes, which would block the interpreter on every request).
 // Dictionary entries whose value is nil are dropped, so unknown fields are
 // simply absent from the JSON (the helper reads them as empty).
 DekenContext {
