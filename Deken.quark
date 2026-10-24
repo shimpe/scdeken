@@ -1,0 +1,10 @@
+(
+	name: "Deken",
+	summary: "Install SuperCollider plugins and quarks",
+	version: "0.1.0",
+	schelp: "Deken",
+	dependencies: [],
+	url: "https://github.com/sc-deken/sc-deken",
+	license: "MIT",
+	copyright: "Stefaan Himpe"
+)
