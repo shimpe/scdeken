@@ -26,13 +26,20 @@ func (e inUseError) Unwrap() error        { return e.cause }
 
 // swapError explains a failed rename of the folder of package name.
 func swapError(name string, err error) error {
+	return moveError("replace", name, err)
+}
+
+// moveError explains why verb (replace, remove, move) could not be done to
+// the files of name: SuperCollider holding them open gets the plain-words
+// message, anything else is wrapped.
+func moveError(verb, name string, err error) error {
 	if isInUse(err) {
 		return inUseError{
-			msg:   fmt.Sprintf("Can't replace %s while SuperCollider is using it. Quit the server (s.quit) and try again.", name),
+			msg:   fmt.Sprintf("Can't %s %s while SuperCollider is using it. Quit the server (s.quit) and try again.", verb, name),
 			cause: err,
 		}
 	}
-	return fmt.Errorf("replace %s: %w", name, err)
+	return fmt.Errorf("%s %s: %w", verb, name, err)
 }
 
 // swapIn puts the finished staging folder in place of target. The previous
