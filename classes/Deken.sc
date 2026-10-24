@@ -15,6 +15,7 @@ Deken {
 	classvar <>indexURL;    // package list address to use instead of the default
 	classvar <>logAction;   // called with each log line of a job; default posts it
 	classvar <>progressAction; // called with (fraction, label); default does nothing
+	classvar <>verbose = false; // post what the quiet startup check would otherwise keep to itself
 
 	// ---- finding
 
@@ -58,6 +59,61 @@ Deken {
 	// Installed packages that an advisory has withdrawn.
 	*advisories { |action|
 		this.prSimple((command: "advisories-check"), action, "advisories")
+	}
+
+	// Looks for installed packages that an advisory has withdrawn. action (optional)
+	// gets the helper's response, whose data is the list of hits. When interactive,
+	// each hit gets a DekenAdvisoryDialog. Never posts anything unless verbose:
+	// this runs at startup, where being offline is normal.
+	*checkAdvisories { |interactive = true, action|
+		DekenHelper.run((command: "advisories-check"), { |r|
+			if(r.ok.not) { this.prQuiet(r[\error]) };
+			if(interactive and: { r.ok } and: { r.data.notEmpty }) { { DekenAdvisoryDialog.showAll(r.data) }.defer };
+			action.value(r)
+		}, { |line| this.prQuiet(line) })
+	}
+
+	// What the dialog may offer for a hit, in the order of its buttons.
+	*prAdvisoryActions { |hit|
+		var fixed = hit["fixed_version"];
+		^[\remove] ++ if(fixed.notNil and: { fixed.notEmpty }) { [\update] } { [] } ++ [\keep, \later]
+	}
+
+	// Keeping a package that holds malware needs a second yes.
+	*prKeepNeedsConfirm { |hit|
+		^hit["advisory"]["severity"] == "malware"
+	}
+
+	// Moves the withdrawn package to quarantine (nothing is deleted). A quark is
+	// first taken out of the class library's include paths. action gets a
+	// response whose after_install lists what the user has to do next.
+	*removeWithdrawn { |hit, action|
+		var item = hit["item"];
+		var problem = if(item["source"] == "quark") {
+			try { DekenQuarks.uninstall(item["name"]); nil } { |err|
+				"Could not take the quark " ++ item["name"] ++ " out of SuperCollider: " ++ err.errorString
+			}
+		};
+		if(problem.notNil) { ^action.value(DekenHelper.prResponse(false, nil, problem, [], 1)) };
+		this.prRequest((command: "quarantine", path: item["path"], advisory_id: hit["advisory"]["id"]), { |r|
+			if(r.ok) { r[\after_install] = this.prRemovalSteps(item) };
+			action.value(r)
+		})
+	}
+
+	// Remembers that the user wants to keep what advisoryID withdrew.
+	*keepWithdrawn { |advisoryID, action|
+		this.prRequest((command: "advisories-keep", advisory_id: advisoryID), action ? this.prDefaultAction("keep"))
+	}
+
+	// Removing files always needs a recompile; plugins need the server restarted too.
+	*prRemovalSteps { |item|
+		var kind = item["kind"].asString;
+		^["recompile"] ++ if(kind.find("plugin").notNil) { ["reboot-server"] } { [] }
+	}
+
+	*prQuiet { |line|
+		if(verbose) { this.prLog(line.asString) }
 	}
 
 	// Permanently deletes the packages in quarantine.

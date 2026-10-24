@@ -48,6 +48,11 @@ DekenHelper {
 		callers.do { |c| try { c[which].value(value) } { |err| err.reportError } }
 	}
 
+	// True when a helper is ready to run without downloading anything.
+	*isInstalled {
+		^Deken.helperPath.notNil or: { try { File.exists(this.installedPath(this.prReadLock)) } { false } }
+	}
+
 	// helper-lock.json next to classes/, unless lockPath says otherwise.
 	*lockFile {
 		^lockPath ?? { DekenHelper.filenameSymbol.asString.dirname.dirname +/+ "helper-lock.json" }

@@ -148,9 +148,9 @@ DekenDialogs {
 	// ---- after install
 
 	// steps: the helper's after_install list. recompile is called for "Recompile now".
-	*afterInstall { |steps, recompile|
+	*afterInstall { |steps, recompile, title = "Installed"|
 		var needsRecompile = steps.indexOfEqual("recompile").notNil;
-		var w = this.prWindow("Installed", 460, 190);
+		var w = this.prWindow(title, 460, 190);
 		var later = Button().states_([[if(needsRecompile) { "Later" } { "OK" }]]).action_({ w.close });
 		var views = [this.prLabel("Done. " ++ DekenStyle.afterInstallText(steps) ++ ".", true)];
 		if(steps.indexOfEqual("reboot-server").notNil) {

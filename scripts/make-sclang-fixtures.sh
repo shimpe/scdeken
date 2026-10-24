@@ -75,6 +75,31 @@ JSON
 SCDEKEN_SIGNING_KEY="$(cat "$fx/keys/scdeken.key")" SCDEKEN_SIGNING_PASSWORD="$SCDEKEN_FIXTURE_PASSWORD" \
 	"$helper" index sign --in "$fx/index.json" >/dev/null
 
+# A second signed index for the advisory tests: EvilQuark 1.0.0 (commit eeee...)
+# is withdrawn as malware, 1.1.0 (ffff...) is the fix.
+mkdir -p "$fx/advisory"
+cat > "$fx/advisory/index.json" <<JSON
+{
+  "schema": 1,
+  "generated": "2026-10-24T12:00:00Z",
+  "sc_versions": [{"version": "3.14.1", "api": 3, "min": "3.13.0"}],
+  "advisories": [
+    {"id": "SCD-2026-0001", "package": "EvilQuark", "versions": ["1.0.0"], "severity": "malware",
+     "summary": "Version 1.0.0 downloads and runs a remote script when the class library compiles.",
+     "details": "https://github.com/example/evilquark/issues/1", "published": "2026-10-20"}
+  ],
+  "packages": [
+    {"name": "EvilQuark", "summary": "A quark that turned out to be malware, for tests", "repo": "https://github.com/example/evilquark",
+     "license": "MIT", "kind": "quark", "trust": "unreviewed", "stars": 0, "pushed": "2026-01-01T00:00:00Z",
+     "scanned_commit": "ffffffffffffffffffffffffffffffffffffffff", "classes": ["EvilQuark"],
+     "versions": [{"version": "1.0.0", "commit": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"},
+                  {"version": "1.1.0", "commit": "ffffffffffffffffffffffffffffffffffffffff"}]}
+  ]
+}
+JSON
+SCDEKEN_SIGNING_KEY="$(cat "$fx/keys/scdeken.key")" SCDEKEN_SIGNING_PASSWORD="$SCDEKEN_FIXTURE_PASSWORD" \
+	"$helper" index sign --in "$fx/advisory/index.json" >/dev/null
+
 # Bootstrap locks: the helper itself is "released" at a file:// URL.
 host="$os-$arch"
 cp "$helper" "$fx/dist/scdeken-$host$ext"

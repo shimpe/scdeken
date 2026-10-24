@@ -26,7 +26,7 @@ var plan = { |name, version, confirm, extra|
 	p
 };
 var main = {
-	var g, dep, tree, canned, doctorDialog;
+	var g, dep, tree, canned, doctorDialog, hit;
 	Deken.helperPath = fixtures +/+ if(File.exists(fixtures +/+ "scdeken.exe")) { "scdeken.exe" } { "scdeken" };
 	Deken.indexURL = "file:///" ++ (fixtures +/+ "index.json").replace(92.asAscii.asString, "/");
 	File.mkdir(outDir);
@@ -153,6 +153,28 @@ var main = {
 	DekenDialogs.ask("Delete quarantined packages", "Permanently delete the packages that were put in quarantine? This cannot be undone.", "Delete them", {});
 	1.5.wait;
 	shot.value(Window.allWindows.last, "deken-dialog-ask");
+	Window.allWindows.last.close;
+
+	// 7. advisory dialogs (made-up hits)
+	hit = { |severity, summary, fixed, kind, path|
+		var h = Dictionary.newFrom(["advisory", Dictionary.newFrom(["id", "SCD-2026-0001", "severity", severity, "summary", summary]),
+			"item", Dictionary.newFrom(["name", "EvilQuark", "version", "1.0.0", "commit", "", "kind", kind, "path", path, "source", "quark"])]);
+		if(fixed.notNil) { h["fixed_version"] = fixed };
+		h
+	};
+	DekenAdvisoryDialog.show(hit.value("malware", "Version 1.0.0 downloads and runs a remote script when the class library compiles.", "1.1.0", "quark",
+		"C:/Users/me/AppData/Local/SuperCollider/downloaded-quarks/EvilQuark"), {});
+	1.5.wait;
+	shot.value(Window.allWindows.last, "deken-advisory-malware");
+	Window.allWindows.last.close;
+	DekenAdvisoryDialog.show(hit.value("vulnerable", "Reads files outside its own folder when given a crafted preset name.", nil, "plugin+quark",
+		"C:/Users/me/AppData/Local/SuperCollider/Extensions/sc-deken/FMX6"), {});
+	1.5.wait;
+	shot.value(Window.allWindows.last, "deken-advisory-vulnerable");
+	Window.allWindows.last.close;
+	DekenDialogs.ask("Keep it anyway?", DekenAdvisoryDialog.keepAnywayText, "Keep it", {});
+	1.5.wait;
+	shot.value(Window.allWindows.last, "deken-advisory-keep");
 	Window.allWindows.last.close;
 };
 SystemClock.sched("SCDEKEN_WATCHDOG".getenv.asFloat, { "RESULT: watchdog timeout".postln; 1.exit });
