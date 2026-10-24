@@ -70,9 +70,28 @@ TestDekenStyle : UnitTest {
 		this.assertEquals(DekenStyle.afterInstallText([]), "nothing to do");
 	}
 
-	test_shorten {
-		this.assertEquals(DekenStyle.shorten("short", 10), "short");
-		this.assertEquals(DekenStyle.shorten("a very long summary", 10), "a very lo…");
+	test_percentEncodeNonASCII {
+		// é is the two bytes C3 A9 in UTF-8; sclang's Char:ascii is signed.
+		this.assertEquals(DekenStyle.percentEncode("café ünd"), "caf%C3%A9%20%C3%BCnd");
+		this.assertEquals(DekenStyle.percentEncode("a-b_c.d~e"), "a-b_c.d~e");
+	}
+
+	test_buildFailureIssue {
+		var url = DekenStyle.buildFailureIssueURL("fmx6", "0.1.0", "windows-x86_64-api3", "3.14.1", ["cmake failed", "error: no FFTW"]);
+		var title = "title=" ++ DekenStyle.percentEncode("Build failed: fmx6 0.1.0 on windows-x86_64-api3");
+		this.assert(url.beginsWith("https://github.com/shimpe/scdeken-recipes/issues/new?"), "goes to the recipes repo: " ++ url);
+		this.assert(url.find(title).notNil, "has the title: " ++ url);
+		this.assert(url.find(DekenStyle.percentEncode("windows-x86_64-api3")).notNil, "names the platform");
+		this.assert(url.find(DekenStyle.percentEncode("3.14.1")).notNil, "names the SuperCollider version");
+		this.assert(url.find(DekenStyle.percentEncode("error: no FFTW")).notNil, "has the log lines");
+	}
+
+	test_buildFailureIssueStaysShort {
+		var lines = (1..30).collect { |i| "line % ".format(i) ++ String.fill(400, $x) };
+		var url = DekenStyle.buildFailureIssueURL("fmx6", "0.1.0", "linux-x86_64-api3", "3.14.1", lines);
+		this.assert(url.size <= 8000, "under 8 KB: " ++ url.size);
+		this.assert(url.find(DekenStyle.percentEncode("line 30 ")).notNil, "keeps the last lines");
+		this.assert(url.find(DekenStyle.percentEncode("line 1 ")).isNil, "drops the first ones");
 	}
 
 	test_links {

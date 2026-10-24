@@ -8,7 +8,7 @@ DekenSettingsView {
 	*new { |actions| ^super.newCopyArgs(actions).prBuild }
 
 	prBuild {
-		var advisories = CheckBox().string_("Check installed packages for withdrawn versions when the window opens")
+		var advisories = CheckBox().string_("Check for withdrawn packages (at startup and when the window opens)")
 			.value_(DekenSettings.get(\checkAdvisories))
 			.action_({ |box| DekenSettings.put(\checkAdvisories, box.value) });
 		var unreviewed = CheckBox().string_("Show unreviewed packages in Browse by default")

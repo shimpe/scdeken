@@ -9,7 +9,7 @@ DekenSettings {
 		^(checkAdvisories: true, showUnreviewed: false, helperPath: "")
 	}
 
-	*path { ^pathOverride ? Platform.userAppSupportDir +/+ "sc-deken" +/+ "settings.scd" }
+	*path { ^pathOverride ?? { Platform.userAppSupportDir +/+ "sc-deken" +/+ "settings.scd" } }
 
 	// Forgets what was read, so the next get reads the file again.
 	*reload { values = nil }

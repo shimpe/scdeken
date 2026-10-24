@@ -94,15 +94,27 @@ DekenHelper {
 		this.prShell(this.curlCommand(part, this.downloadURL(lock))) { |exit|
 			if(exit != 0) {
 				this.prDiscard(part);
-				this.prFail("downloading the helper failed (curl exit code %).".format(exit), onFail)
+				this.prFail(this.curlFailure(exit), onFail)
 			} {
 				this.prVerify(part, path, expected, onReady, onFail)
 			}
 		}
 	}
 
+	// curl gives up after 30 s without a connection or 10 minutes in all, so
+	// a stalled download never keeps the waiting callers waiting forever.
 	*curlCommand { |outFile, url|
-		^DekenShell.command(if(DekenShell.isWindows) { "curl.exe" } { "curl" }, ["-fL", "-sS", "-o", outFile, url])
+		^DekenShell.command(if(DekenShell.isWindows) { "curl.exe" } { "curl" },
+			["-fL", "-sS", "--connect-timeout", "30", "--max-time", "600", "-o", outFile, url])
+	}
+
+	// What to tell the user when curl exits with code exit.
+	*curlFailure { |exit|
+		^if(exit == 28) {
+			"downloading the helper took too long and was stopped. Check the internet connection and try again."
+		} {
+			"downloading the helper failed (curl exit code %).".format(exit)
+		}
 	}
 
 	*prVerify { |part, path, expected, onReady, onFail|
@@ -213,13 +225,15 @@ DekenHelper {
 		protect { file.write(DekenJSON.stringify(body)) } { file.close };
 	}
 
+	// The listeners survive Ctrl+. (fix), so a job's log is not cut off;
+	// prUnlisten frees them when the job ends.
 	*prListen { |job, onLog, onProgress|
 		OSCdef(this.prKey(\log, job), { |msg|
 			if(msg[1].asString == job) { onLog.value(msg[2].asString) }
-		}, '/deken/log');
+		}, '/deken/log').fix;
 		OSCdef(this.prKey(\progress, job), { |msg|
 			if(msg[1].asString == job) { onProgress.value(msg[2], msg[3].asString) }
-		}, '/deken/progress');
+		}, '/deken/progress').fix;
 	}
 
 	*prUnlisten { |job|

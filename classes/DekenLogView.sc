@@ -36,6 +36,11 @@ DekenLogView {
 		dirty = true;
 	}
 
+	// The newest n lines, oldest first.
+	lastLines { |n|
+		^lines.asArray.copyToEnd((lines.size - n).max(0))
+	}
+
 	header { |title|
 		this.add("");
 		this.add("== % (%) ==".format(title, Date.getDate.format("%H:%M:%S")))

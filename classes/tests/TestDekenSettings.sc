@@ -24,6 +24,17 @@ TestDekenSettings : UnitTest {
 		this.assertEquals(DekenSettings.get(\checkAdvisories), true, "others keep their default");
 	}
 
+	test_pathOverrideIsTheFile {
+		this.assertEquals(DekenSettings.path, DekenSettings.pathOverride);
+	}
+
+	test_defaultPath {
+		var override = DekenSettings.pathOverride;
+		DekenSettings.pathOverride = nil;
+		this.assertEquals(DekenSettings.path, Platform.userAppSupportDir +/+ "sc-deken" +/+ "settings.scd");
+		DekenSettings.pathOverride = override;
+	}
+
 	test_damagedFileFallsBackToDefaults {
 		var f;
 		DekenHelper.prMkdirs(DekenSettings.path.dirname);

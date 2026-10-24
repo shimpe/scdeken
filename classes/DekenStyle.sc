@@ -95,11 +95,33 @@ DekenStyle {
 		^"https://github.com/shimpe/scdeken-recipes/issues/new?template=add-package.yml&repo_url=%".format(this.percentEncode(repo))
 	}
 
-	// Escapes everything but letters, digits and - . _ ~ for use in a web address.
+	// A new issue on the recipes repository about a local build that failed:
+	// title "Build failed: <package> <version> on <platform>", and a body with
+	// the platform key, the SuperCollider version and the last log lines. The
+	// oldest lines are left out until the address fits in 8000 characters.
+	*buildFailureIssueURL { |package, version, platform, scVersion, logLines|
+		var title = "Build failed: % % on %".format(package, version, platform);
+		var lines = logLines.asArray.copyToEnd((logLines.size - 30).max(0));
+		var url;
+		while {
+			url = "https://github.com/shimpe/scdeken-recipes/issues/new?title=%&body=%".format(
+				this.percentEncode(title), this.percentEncode(this.prBuildFailureBody(platform, scVersion, lines)));
+			url.size > 8000 and: { lines.notEmpty }
+		} { lines = lines.drop(1) };
+		^url
+	}
+
+	*prBuildFailureBody { |platform, scVersion, lines|
+		^"Platform: %\nSuperCollider: %\n\nLast lines of the build log:\n\n```\n%\n```\n".format(platform, scVersion, lines.join("\n"))
+	}
+
+	// Escapes everything but ASCII letters, digits and - . _ ~ for use in a
+	// web address. Other characters are encoded byte by byte (UTF-8).
 	*percentEncode { |text|
 		var out = List.new;
 		text.asString.do { |c|
-			out.add(if(c.isAlphaNum and: { c.ascii < 128 } or: { "-._~".includes(c) }) { c.asString } { "%" ++ c.ascii.asHexString(2).toUpper })
+			var byte = c.ascii & 255; // Char:ascii is signed for bytes above 127
+			out.add(if(byte < 128 and: { c.isAlphaNum or: { "-._~".includes(c) } }) { c.asString } { "%" ++ byte.asHexString(2).toUpper })
 		};
 		^out.join
 	}
@@ -137,24 +159,5 @@ DekenStyle {
 		if(steps.indexOfEqual("recompile").notNil) { parts.add("Recompile class library") };
 		if(steps.indexOfEqual("reboot-server").notNil) { parts.add("reboot server") };
 		^if(parts.isEmpty) { "nothing to do" } { parts.join(" · ") }
-	}
-
-	// Cuts text to at most `max` characters, ending in "…" when it was cut.
-	// Never leaves half of a multi-byte character behind.
-	*shorten { |text, max|
-		var cut;
-		if(text.size <= max) { ^text };
-		cut = text.keep(max - 1);
-		^this.prDropPartialChar(cut) ++ "…"
-	}
-
-	*prDropPartialChar { |text|
-		var i = text.size - 1;
-		var lead, need;
-		while { i >= 0 and: { text[i].ascii.inclusivelyBetween(128, 191) } } { i = i - 1 };
-		if(i < 0) { ^"" };
-		lead = text[i].ascii;
-		need = case { lead >= 240 } { 4 } { lead >= 224 } { 3 } { lead >= 192 } { 2 } { 1 };
-		^if(text.size - i < need) { text.keep(i) } { text }
 	}
 }
