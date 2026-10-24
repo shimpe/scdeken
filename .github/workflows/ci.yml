@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: go vet
+        run: go vet ./...
+      - name: gofmt
+        shell: bash
+        run: test -z "$(gofmt -l .)"
+      - name: go test
+        run: go test ./...
+
+  e2e:
+    name: e2e build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build scdeken
+        shell: bash
+        run: go build -o scdeken-bin ./cmd/scdeken
+      - name: Doctor
+        shell: bash
+        run: ./scdeken-bin doctor
+      - name: Build a real plugin into a path with spaces
+        shell: bash
+        run: |
+          out="$RUNNER_TEMP/out dir with spaces"
+          ./scdeken-bin build \
+            --recipe testdata/e2e/safety-limiter.toml \
+            --version 0.1.0 \
+            --out "$out" \
+            --sc-version 3.14.1
+      - name: Assert a plugin file was produced
+        shell: bash
+        run: |
+          out="$RUNNER_TEMP/out dir with spaces"
+          found="$(find "$out" -type f \( -name '*.scx' -o -name '*.so' \))"
+          if [ -z "$found" ]; then
+            echo "No .scx or .so file found under: $out" >&2
+            exit 1
+          fi
+          echo "$found"

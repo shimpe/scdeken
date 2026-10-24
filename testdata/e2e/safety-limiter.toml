@@ -1,0 +1,20 @@
+name = "supercollider-safety-limiter"
+summary = "A zero-latency safety limiter for SuperCollider"
+repo = "https://github.com/nhthn/supercollider-safety-limiter"
+license = "GPL-3.0"
+authors = ["nhthn"]
+kind = "plugin"
+
+[build]
+system = "cmake"
+subdir = ""
+sc_path_var = "SC_PATH"
+cmake_flags = ["-DSUPERNOVA=ON"]
+submodules = true
+
+[versions]
+tag_prefix = ""
+
+[versions.approved]
+"0.1.0" = "7d99fe3301712ebd666eab659197317f2a73a8bb"
+# NOTE: no tags upstream; version name 0.1.0 chosen for commit 7d99fe3

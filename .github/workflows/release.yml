@@ -1,0 +1,108 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  check-key:
+    name: check signing key is embedded
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail if EmbeddedPublicKey is empty
+        run: |
+          if ! grep -q 'EmbeddedPublicKey = "RW' internal/sign/key.go; then
+            echo "::error file=internal/sign/key.go::EmbeddedPublicKey is empty. Run 'scdeken index keygen', paste the public key (starts with RW) into internal/sign/key.go, commit, and tag again."
+            exit 1
+          fi
+
+  build:
+    name: build ${{ matrix.platform }}
+    needs: check-key
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        include:
+          - {platform: linux-x86_64, goos: linux, goarch: amd64, ext: ""}
+          - {platform: linux-arm64, goos: linux, goarch: arm64, ext: ""}
+          - {platform: macos-x86_64, goos: darwin, goarch: amd64, ext: ""}
+          - {platform: macos-arm64, goos: darwin, goarch: arm64, ext: ""}
+          - {platform: windows-x86_64, goos: windows, goarch: amd64, ext: ".exe"}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Cross-compile
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          TAG: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          PLATFORM: ${{ matrix.platform }}
+          EXT: ${{ matrix.ext }}
+        run: |
+          pkg=github.com/sc-deken/sc-deken/internal/cli
+          mkdir -p dist
+          go build -trimpath \
+            -ldflags "-s -w -X ${pkg}.buildVersion=${TAG#v} -X ${pkg}.buildCommit=${SHA}" \
+            -o "dist/scdeken-${PLATFORM}${EXT}" ./cmd/scdeken
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scdeken-${{ matrix.platform }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    name: publish release and open helper-lock PR
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: scdeken-*
+          merge-multiple: true
+      - name: Write SHA256SUMS
+        working-directory: dist
+        run: sha256sum scdeken-* > SHA256SUMS
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" dist/* --title "$TAG" --generate-notes
+      - name: Open PR updating helper-lock.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          hashes='{}'
+          for f in dist/scdeken-*; do
+            name="$(basename "$f")"
+            platform="${name#scdeken-}"
+            platform="${platform%.exe}"
+            sum="$(sha256sum "$f" | cut -d' ' -f1)"
+            hashes="$(jq --arg p "$platform" --arg s "$sum" '. + {($p): $s}' <<<"$hashes")"
+          done
+          jq --arg v "$version" --argjson h "$hashes" \
+            '.version = $v | .sha256 = $h' helper-lock.json > helper-lock.new
+          mv helper-lock.new helper-lock.json
+          branch="release/helper-lock-v${version}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git commit -am "Update helper-lock.json for v${version}"
+          git push origin "$branch"
+          gh pr create --base main --head "$branch" \
+            --title "Update helper-lock.json for v${version}" \
+            --body "Automated: pins the helper binaries released in ${TAG}."
