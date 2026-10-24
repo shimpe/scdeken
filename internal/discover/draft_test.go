@@ -1,6 +1,7 @@
 package discover
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -124,5 +125,37 @@ func TestParseGitHubURL(t *testing.T) {
 	}
 	if _, _, err := ParseGitHubURL("https://gitlab.com/a/b"); err == nil || !strings.Contains(err.Error(), "only GitHub") {
 		t.Errorf("err = %v", err)
+	}
+}
+
+func TestPickReleaseSameVersionIsDeterministic(t *testing.T) {
+	tags := map[string]string{"v1.0": sha0, "1.0": sha1, "0.9": head}
+	for i := 0; i < 50; i++ {
+		if rel := PickRelease(head, tags); rel.Version != "1.0" || rel.Commit != sha1 {
+			t.Fatalf("run %d: release = %+v", i, rel)
+		}
+	}
+}
+
+func TestDraftWithDependsAndBuildSurvivesRoundTrip(t *testing.T) {
+	scan := Scan{
+		Kind: recipe.KindPluginQuark, HasQuark: true, CMakeDir: "src", SCPathVar: "SC_SRC_PATH",
+		Submodules: true, MentionsSupernova: true,
+		Quark: QuarkFile{Name: "Both", Summary: "s", Dependencies: []string{"Other", "More"}},
+	}
+	r, _, err := DraftRecipe(url, pluginMeta, scan, head, map[string]string{"Version-2.1": sha1, "Version-2.0": sha0})
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := recipe.Marshal(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	back, err := recipe.Parse(data)
+	if err != nil {
+		t.Fatalf("%v\n%s", err, data)
+	}
+	if !reflect.DeepEqual(r, back) {
+		t.Errorf("round trip differs:\n%+v\n%+v\n%s", r, back, data)
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/sc-deken/sc-deken/internal/github"
@@ -46,7 +47,7 @@ func PickRelease(head string, tags map[string]string) Release {
 	}
 	var best version.Version
 	var bestTag string
-	for tag := range tags {
+	for _, tag := range tieOrder(tags) {
 		v, parsed := version.FromTag(tag, prefix)
 		if !parsed || !betterRelease(v, best, bestTag != "") {
 			continue
@@ -54,6 +55,23 @@ func PickRelease(head string, tags map[string]string) Release {
 		best, bestTag = v, tag
 	}
 	return Release{TagPrefix: prefix, Version: best.String(), Commit: tags[bestTag], Tagged: true}
+}
+
+// tieOrder lists the tag names so that, when two tags give the same version,
+// the first one listed wins: tags without a "v" prefix first, then by name.
+func tieOrder(tags map[string]string) []string {
+	names := make([]string, 0, len(tags))
+	for tag := range tags {
+		names = append(names, tag)
+	}
+	sort.Slice(names, func(i, j int) bool {
+		vi, vj := strings.HasPrefix(names[i], "v"), strings.HasPrefix(names[j], "v")
+		if vi != vj {
+			return vj
+		}
+		return names[i] < names[j]
+	})
+	return names
 }
 
 // betterRelease reports whether v should replace the current best: newer
