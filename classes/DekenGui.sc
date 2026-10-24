@@ -250,7 +250,7 @@ DekenGui {
 		Deken.info(name, { |r|
 			{
 				if(selectedName == name) {
-					if(r.ok) { details.fill(r.data); this.prPlanSelected } { details.setPlanError(r.error) }
+					if(r.ok) { details.fill(r.data, installed, catalog); this.prPlanSelected } { details.setPlanError(r.error) }
 				}
 			}.defer
 		})
@@ -377,7 +377,7 @@ DekenGui {
 			row[\update] = have.notNil and: { have["update_available"] == true };
 			this.prRefreshStatus(row[\name])
 		};
-		selectedRow !? { |row| details.setInstalled(row[\installed], row[\update]) }
+		selectedRow !? { |row| details.setInstalled(row[\installed], row[\update]); details.showNeeds(installed, catalog) }
 	}
 
 	prFailed { |title, r|

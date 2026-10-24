@@ -9,6 +9,19 @@
 // Tests can replace the real calls with
 // `DekenQuarks.override_((install: { |url, commit| ... }, ...))`; a function
 // that returns false (or throws) models a failure. Pass nil to restore.
+//
+// Dependencies: the plan lists every dependency of a quark and the helper
+// returns them first, in order, each pinned to its own commit (see
+// Deken.prInstallQuarks). SuperCollider 3.14.1's Quarks.installQuark does NOT
+// skip a dependency that is already installed: for every entry of the
+// .quark file's dependencies it calls Quark:install again, which runs
+// Quark:checkout (moving an installed dependency to the refspec written in
+// the .quark file, such as "Name@tags/1.2", and undoing our pin), runs the
+// preInstall and postInstall hooks a second time and fetches anything the
+// plan decided to leave alone. Only an entry without a refspec is harmless.
+// So *install does not call Quarks.install: it checks out the quark and links
+// it (what installQuark does apart from the dependency loop), and leaves the
+// dependencies to the plan.
 DekenQuarks {
 	classvar override;
 
@@ -19,12 +32,33 @@ DekenQuarks {
 		var refspec = if(commit.isNil or: { commit.isEmpty }) { nil } { commit };
 		var quark;
 		if(override.notNil) { ^this.prExpect(override[\install].value(url, refspec), "install " ++ url) };
-		quark = Quarks.install(url, refspec);
-		Quarks.clearCache;
+		quark = this.prInstallOnly(url, refspec);
 		if(quark.isNil or: { Quarks.pathIsInstalled(quark.localPath).not }) {
 			Error("the quark at % could not be installed (see the messages above)".format(url)).throw
 		};
 		this.prVerifyCommit(quark, refspec);
+		^quark
+	}
+
+	// Quarks.installQuark without its dependency loop: checks the quark out at
+	// refspec, runs the install hooks and adds it to the include paths.
+	*prInstallOnly { |url, refspec|
+		var quark = Quark(url, refspec);
+		var prev = this.prFind(quark.name);
+		if(prev.notNil and: { prev.localPath != quark.localPath }) {
+			Error("a version of % is already installed at %".format(quark.name, prev.localPath)).throw
+		};
+		quark.checkout;
+		if(Git.isGit(quark.localPath).not) {
+			Error("the quark at % could not be downloaded".format(url)).throw
+		};
+		if(quark.isCompatible.not) {
+			Error("% reports an incompatibility with this SuperCollider version or with other installed quarks".format(quark.name)).throw
+		};
+		quark.runHook('preInstall');
+		Quarks.link(quark.localPath);
+		quark.runHook('postInstall');
+		Quarks.clearCache;
 		^quark
 	}
 

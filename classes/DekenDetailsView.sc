@@ -40,18 +40,25 @@ DekenDetailsView {
 		this.prUpdateButtons;
 	}
 
-	// info is the helper's info answer: package and retractions.
-	fill { |info|
+	// info is the helper's info answer: package and retractions. installed and
+	// catalog (both keyed by lowercase name) say what the Needs lines can tick
+	// off; leave them out when unknown.
+	fill { |info, installed, catalog|
 		package = info["package"];
 		byline.string = DekenDetailsView.bylineText(package);
 		summary.string = package["summary"];
 		inside.string = DekenDetailsView.insideLines(package).join("\n");
-		needs.string = DekenDetailsView.needsText(package);
+		this.showNeeds(installed, catalog);
 		versionNames = DekenDetailsView.versionLabels(package);
 		versionMenu.items = versionNames;
 		row[\retractedVersions] = (info["retractions"] ? []).collect { |r| r["version"] };
 		this.prShowBadge;
 		this.prUpdateButtons;
+	}
+
+	// Writes the Needs lines again, for example after something was installed.
+	showNeeds { |installed, catalog|
+		needs.string = if(package.isNil) { "" } { DekenDetailsView.needsText(package, installed, catalog) }
 	}
 
 	// plan: the helper's plan for the selected version.
@@ -125,9 +132,36 @@ DekenDetailsView {
 		}.asArray
 	}
 
-	*needsText { |pkg|
-		var names = (pkg["depends"] ? Dictionary.new).keys.asArray.sort;
-		^if(names.isEmpty) { "" } { "Needs: " ++ names.join(", ") }
+	// One line per dependency with where it stands. installed and catalog map
+	// lowercase names to the helper's entries (nil counts as empty).
+	*needsLines { |pkg, installed, catalog|
+		var depends = pkg["depends"] ? Dictionary.new;
+		var unresolved = pkg["depends_unresolved"] ? Dictionary.new;
+		var names = depends.keys.asArray.sort { |a, b| a.toLower <= b.toLower };
+		var lines = names.collect { |name|
+			this.prNeedLine(name, depends[name], this.prDependencyState(name.toLower, installed, catalog))
+		};
+		^lines ++ unresolved.keys.asArray.sort.collect { |url|
+			this.prNeedLine(url.split($/).last.replace(".git", ""), unresolved[url], "unreviewed, from " ++ url)
+		}
+	}
+
+	*needsText { |pkg, installed, catalog|
+		var lines = this.needsLines(pkg, installed, catalog);
+		^if(lines.isEmpty) { "" } { "Needs:\n" ++ lines.join("\n") }
+	}
+
+	*prDependencyState { |key, installed, catalog|
+		^case
+		{ installed.notNil and: { installed[key].notNil } } { "installed ✓" }
+		{ catalog.notNil and: { catalog[key].notNil } } { "will be installed" }
+		{ true } { "not in the package list" }
+	}
+
+	// "  name (>=1.0) - state"; "any version" leaves the range out.
+	*prNeedLine { |name, constraint, state|
+		var range = if(constraint.isNil or: { constraint.isEmpty or: { constraint == "*" } }) { "" } { " (" ++ constraint ++ ")" };
+		^"  " ++ name ++ range ++ " - " ++ state
 	}
 
 	*versionLabels { |pkg|
