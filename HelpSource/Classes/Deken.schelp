@@ -161,7 +161,7 @@ Package name.
 ARGUMENT:: version
 Version, or code::nil:: for the newest.
 ARGUMENT:: choices
-An Event with your answers: code::confirm_unreviewed:: (true), code::confirm_retracted:: (true), code::on_duplicate:: (code::"replace":: or code::"keep"::).
+An Event with your answers: code::confirm_unreviewed:: (true), code::confirm_retracted:: (true), code::on_duplicate:: (code::"replace":: or code::"keep"::), and optionally code::commits:: (code::Deken.planCommits(plan)::, the commits of the plan you were shown). With commits, the install only goes ahead if the plan is still the same; otherwise the response asks again with code::"changed":: in its confirm list.
 ARGUMENT:: action
 Function called with the response. When it finishes, a message says whether to recompile the class library and reboot the server.
 code::
@@ -169,14 +169,28 @@ Deken.installConfirmed(\somePackage, nil, (confirm_unreviewed: true));
 ::
 
 METHOD:: update
-Installs the newest version of a package. An installed quark is moved to the new version (with link::Classes/Quarks::); plugins are replaced and the old copy is kept in the backup folder.
+Installs the newest version of a package, or without a name of every package that has an update. An installed quark is moved to the new version (with link::Classes/Quarks::); plugins are replaced and the old copy is kept in the backup folder.
 ARGUMENT:: name
-Package name.
+Package name, or code::nil:: for everything that has an update.
 ARGUMENT:: action
-Function called with the response. Asks for confirmation like link::#*install::.
+Function called with the response. Asks for confirmation like link::#*install::. When updating everything needs an OK, nothing is installed: the response has code::needsConfirmation: true:: and its data lists the code::plans::; answer with link::#*updateConfirmed::.
 code::
 Deken.update(\Panola);
+Deken.update;   // everything
 ::
+
+METHOD:: updateConfirmed
+Updates every package that has an update, with your answers (see link::#*installConfirmed::).
+ARGUMENT:: choices
+An Event with your answers, as for link::#*installConfirmed::.
+ARGUMENT:: action
+Function called with the response.
+
+METHOD:: planCommits
+The commit of every package in a plan and its dependencies (or in each of the code::plans:: of an update response), keyed by package name.
+ARGUMENT:: plan
+A plan from link::#*plan:: or a response's data.
+returns:: A Dictionary.
 
 METHOD:: remove
 Removes a package installed through sc-deken, or uninstalls a quark.

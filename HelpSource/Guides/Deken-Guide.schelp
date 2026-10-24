@@ -111,7 +111,7 @@ Press Update to install the newest version. The old version stays in place until
 SECTION:: Withdrawn packages
 Sometimes a package turns out to be a problem: it contains malware, a serious security hole, or a bug that can crash your computer or lose your work. The maintainers can withdraw it. A withdrawn version is shown in red as "⛔ retracted". For malware the install is refused; for a serious vulnerability or a dangerous bug you can still install it after a warning.
 
-When you start SuperCollider, Deken quietly checks whether anything you have installed was withdrawn. If so, a window tells you which package, why, and where it is on your computer. Offline, the check is skipped without a word.
+When you start SuperCollider, Deken quietly checks whether anything you have installed was withdrawn. If so, a window tells you which package, why, and where it is on your computer. Offline, the check uses the saved, signed package list (and says nothing if there is none yet).
 
 image::images/advisory-malware.png#A package on your computer was withdrawn::
 
@@ -128,7 +128,7 @@ Removing malware stops it from running again, but it cannot undo what it already
 
 SECTION:: Settings
 list::
-## Check installed packages for withdrawn versions when the window opens (on by default).
+## Check for withdrawn packages (at startup and when the window opens) (on by default).
 ## Show unreviewed packages in Browse by default (off by default).
 ## Use this scdeken program instead of the downloaded one: for developers; leave it empty.
 ## Delete quarantined packages... removes quarantined packages for good, after asking.
@@ -145,6 +145,7 @@ Deken.install(\Panola);          // a quark
 Deken.install(\portedplugins);   // a plugin
 Deken.install(\portedplugins, "0.4.1");   // a specific version
 Deken.update(\portedplugins);
+Deken.update;                    // every package that has an update
 Deken.remove(\portedplugins);
 Deken.list;                      // what is installed
 Deken.doctor;                    // are the build tools there?
@@ -155,10 +156,10 @@ definitionlist::
 ## "Can't update/remove X while SuperCollider is using it. Quit the server (s.quit) and try again." (Windows) || Windows will not let a program replace a plugin file that the sound server has loaded. Run code::s.quit::, repeat the update or removal, then code::s.boot:: again.
 ## The new UGen is not found || Recompile the class library and reboot the server (code::s.reboot::). Both are needed after installing a plugin.
 ## "No package list yet" || The list has never been downloaded on this computer. Connect to the internet, then press Refresh package list in Settings.
-## Working offline || After the list has been downloaded once, search and browsing use the saved, signed copy and work without internet. Installing a prebuilt plugin, building from source and the withdrawn-package check need a connection.
+## Working offline || After the list has been downloaded once, search, browsing and the check for withdrawn packages use the saved, signed copy and work without internet. Installing a prebuilt plugin and building from source need a connection.
 ## The package list could not be verified || Deken refuses a list whose signature does not match and keeps using the last good copy. If it persists, update Deken with code::Quarks.update("scdeken");:: (the quark is named after its address) and recompile.
 ## Antivirus software gets in the way || Antivirus (for example Norton on Windows) can hold or quarantine a freshly downloaded helper, or block git for a moment while it writes files ("Permission denied", "failed to write object" in the Build log). Try again; fetched files are kept. If it keeps happening, allow the code::sc-deken:: folders inside code::Platform.userAppSupportDir:: and code::Platform.userExtensionDir:: in your antivirus, but only those.
 ## Tools are missing for a local build || Install what the dialog names and press Check again. If a tool is installed but not found, restart SuperCollider so it sees the updated PATH.
-## A build fails || Open the Build log page and read the last lines. Copy the log when you ask the package's author for help, and mention the platform line from the bottom of the window.
+## A build fails || Open the Build log page and read the last lines. The failure window has a Report this problem button that opens a GitHub issue for the reviewers, filled in with the package, your platform, your SuperCollider version and the last log lines (read it before you send it). On Windows, packages that need extra system libraries (sc3-plugins needs FFTW) may fail to link when built locally; use the prebuilt download there. Copy the log when you ask the package's author for help, and mention the platform line from the bottom of the window.
 ## Where are my files? || Plugins installed by Deken are in code::Platform.userExtensionDir +/+ "sc-deken":: (one folder per package). The backup and quarantine folders are in code::Platform.userAppSupportDir +/+ "sc-deken"::.
 ::

@@ -190,6 +190,11 @@ The first build also downloads the SuperCollider source that matches your versio
 (one time; it is kept for later builds). This needs git and an internet connection and
 can take a few minutes. Building a small plugin takes a minute or two.
 
+On Windows, packages that need extra system libraries may fail to link when built here
+(for example sc3-plugins needs FFTW, which a plain Windows computer does not have). Use
+the prebuilt download on Windows: if a package only offers a local build, wait until the
+reviewers have published a prebuilt version.
+
 Everything the build prints goes to the **Build log** page, so you can see what is
 happening or copy the text if you need to ask for help:
 
@@ -266,7 +271,8 @@ hole, or a bug that can crash your computer or lose your work. The maintainers c
 
 - When you start SuperCollider, sc-deken quietly checks whether anything you have
   installed was withdrawn. If so, a window tells you which package, why, and where it
-  is on your computer. If you are offline the check is skipped without a word.
+  is on your computer. Offline, the check uses the saved, signed package list (and
+  says nothing if there is none yet).
 
   ![A withdrawn package on your computer](screenshots/advisory-malware.png)
 
@@ -301,8 +307,9 @@ Quarantined packages stay on disk until you delete them yourself in *Settings*.
 
 ![Settings](screenshots/12-settings.png)
 
-- **Check installed packages for withdrawn versions when the window opens** (on by
-  default). Turn it off if you never want sc-deken to look.
+- **Check for withdrawn packages (at startup and when the window opens)** (on by
+  default). Turn it off if you never want sc-deken to look, neither when
+  SuperCollider starts nor when the window opens.
 - **Show unreviewed packages in Browse by default** (off by default).
 - **Use this scdeken program instead of the downloaded one**: for developers. Leave it
   empty.
@@ -326,14 +333,17 @@ Deken.install(\Panola);          // a quark
 Deken.install(\portedplugins);   // a plugin
 Deken.install(\portedplugins, "0.4.1");   // a specific version
 Deken.update(\portedplugins);
+Deken.update;                    // every package that has an update
 Deken.remove(\portedplugins);
 Deken.list;                      // what is installed
 Deken.doctor;                    // are the build tools there?
 ```
 
 If an install needs your OK (unreviewed, withdrawn, existing copy) nothing is
-installed, and the posted message shows the exact `Deken.installConfirmed` call to make
-if you agree. See the help page `Deken` for all methods.
+installed, and the posted message shows the exact `Deken.installConfirmed` call (for
+`Deken.update` without a name: `Deken.updateConfirmed`) to make if you agree. If the
+package list changes between your OK and the install, sc-deken says so and asks again.
+See the help page `Deken` for all methods.
 
 ## 14. Troubleshooting
 
@@ -351,10 +361,10 @@ The list has never been downloaded on this computer. Connect, then press
 *Refresh package list* in Settings.
 
 **Working offline.** After the list has been downloaded once, search and browsing use
-the saved, signed copy, so they work without internet. Installing a prebuilt plugin,
-building from source and the withdrawn-package check need a connection. If the server
-cannot be reached, sc-deken says "Using the package list from <date>" in the Build log and
-carries on with the saved copy.
+the saved, signed copy, so they work without internet, and so does the check for
+withdrawn packages (it checks against that saved copy). Installing a prebuilt plugin and
+building from source need a connection. If the server cannot be reached, sc-deken says
+"Using the package list from <date>" in the Build log and carries on with the saved copy.
 
 **The package list could not be verified.** sc-deken refuses a list whose signature
 does not match, and keeps using the last good copy. If it persists, update sc-deken
@@ -366,8 +376,15 @@ does not match, and keeps using the last good copy. If it persists, update sc-de
 the updated PATH.
 
 **A build fails.** Open the Build log page and read the last lines. Often a plugin does
-not support your SuperCollider or compiler version. Copy the log when you ask the package's
-author for help, and mention your platform line from the bottom of the window.
+not support your SuperCollider or compiler version. The failure window has a **Report this
+problem** button: it opens a GitHub issue for the reviewers, already filled in with the
+package, your platform, your SuperCollider version and the last lines of the log (read it
+before you send it). You can also copy the log when you ask the package's author for help,
+and mention your platform line from the bottom of the window.
+
+**The helper download stops with "took too long".** sc-deken gives up on a download that
+cannot connect within 30 seconds or takes more than 10 minutes. Check your connection and
+try again.
 
 **The helper cannot be downloaded or fails its checksum.** sc-deken will not run a helper
 it could not verify. Check your internet connection and any firewall, then try again.
