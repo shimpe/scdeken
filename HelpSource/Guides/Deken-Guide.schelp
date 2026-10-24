@@ -59,17 +59,19 @@ table::
 
 SUBSECTION:: Status
 table::
-## reviewed - prebuilt || A maintainer reviewed this exact version, and there is a ready-made download for your computer.
-## reviewed - build locally || Reviewed, but no download for your computer: Deken builds it here.
+## reviewed · prebuilt || A maintainer reviewed this exact version, and there is a ready-made download for your computer.
+## reviewed · build locally || Reviewed, but no download for your computer: Deken builds it here.
 ## community-listed || A quark from SuperCollider's official quarks list.
-## unreviewed || Found automatically. Nobody has looked at it.
+## ⚠ unreviewed · build locally (plugins) or ⚠ unreviewed (quarks) || Found automatically. Nobody has looked at it.
+## reviewed || Reviewed. A row says only this until you select it.
 ## update available || You have it, and a newer version exists.
-## retracted (red) || Withdrawn because of malware, a serious problem or a dangerous bug.
-## working... || An install, update or removal is running.
+## installed || You have it, and Deken knows nothing more about it (for example a copy you put there by hand).
+## ⛔ retracted (red) || Withdrawn because of malware, a serious problem or a dangerous bug.
+## working… || An install, update or removal is running.
 ::
 
 SECTION:: Install a package
-Select a package and press Install. A reviewed plugin with a prebuilt download is downloaded, checked against the signed package list and unpacked into the sc-deken folder inside your extensions folder. Quarks are installed by SuperCollider itself, as if you had used code::Quarks.install::, and some quarks need other quarks: the details pane lists them and Deken installs them first.
+Select a package and press Install. A reviewed plugin with a prebuilt download is downloaded, checked against the signed package list and unpacked into the sc-deken folder inside your extensions folder. Quarks are installed through SuperCollider's own Quarks system, pinned to the reviewed commit, and some quarks need other quarks: the details pane lists them and Deken installs them first.
 
 When it is done a window tells you what to do next:
 
@@ -81,7 +83,7 @@ list::
 The Version box lists the versions that are available; the newest is chosen.
 
 SECTION:: When a package has to be built on your computer
-Some plugins have no ready-made download for your computer. The status says "reviewed - build locally".
+Some plugins have no ready-made download for your computer. The status says "reviewed · build locally".
 
 image::images/03-local-build.png#A plugin that will be built on this computer::
 
@@ -107,7 +109,7 @@ image::images/07-installed.png#The Installed page; portedplugins has an update w
 Press Update to install the newest version. The old version stays in place until the new one is ready, and comes back if the update fails. Press Remove to take a package off your computer (you are asked first). Removal deletes the plugin's folder, or uninstalls the quark.
 
 SECTION:: Withdrawn packages
-Sometimes a package turns out to be a problem: it contains malware, a serious security hole, or a bug that can crash your computer or lose your work. The maintainers can withdraw it. A withdrawn version is shown in red as "retracted". For malware the install is refused; for a serious vulnerability or a dangerous bug you can still install it after a warning.
+Sometimes a package turns out to be a problem: it contains malware, a serious security hole, or a bug that can crash your computer or lose your work. The maintainers can withdraw it. A withdrawn version is shown in red as "⛔ retracted". For malware the install is refused; for a serious vulnerability or a dangerous bug you can still install it after a warning.
 
 When you start SuperCollider, Deken quietly checks whether anything you have installed was withdrawn. If so, a window tells you which package, why, and where it is on your computer. Offline, the check is skipped without a word.
 
@@ -154,7 +156,8 @@ definitionlist::
 ## The new UGen is not found || Recompile the class library and reboot the server (code::s.reboot::). Both are needed after installing a plugin.
 ## "No package list yet" || The list has never been downloaded on this computer. Connect to the internet, then press Refresh package list in Settings.
 ## Working offline || After the list has been downloaded once, search and browsing use the saved, signed copy and work without internet. Installing a prebuilt plugin, building from source and the withdrawn-package check need a connection.
-## The package list could not be verified || Deken refuses a list whose signature does not match and keeps using the last good copy. If it persists, update Deken with code::Quarks.update("Deken");:: and recompile.
+## The package list could not be verified || Deken refuses a list whose signature does not match and keeps using the last good copy. If it persists, update Deken with code::Quarks.update("scdeken");:: (the quark is named after its address) and recompile.
+## Antivirus software gets in the way || Antivirus (for example Norton on Windows) can hold or quarantine a freshly downloaded helper, or block git for a moment while it writes files ("Permission denied", "failed to write object" in the Build log). Try again; fetched files are kept. If it keeps happening, allow the code::sc-deken:: folders inside code::Platform.userAppSupportDir:: and code::Platform.userExtensionDir:: in your antivirus, but only those.
 ## Tools are missing for a local build || Install what the dialog names and press Check again. If a tool is installed but not found, restart SuperCollider so it sees the updated PATH.
 ## A build fails || Open the Build log page and read the last lines. Copy the log when you ask the package's author for help, and mention the platform line from the bottom of the window.
 ## Where are my files? || Plugins installed by Deken are in code::Platform.userExtensionDir +/+ "sc-deken":: (one folder per package). The backup and quarantine folders are in code::Platform.userAppSupportDir +/+ "sc-deken"::.

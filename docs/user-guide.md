@@ -83,7 +83,7 @@ or newer, and an internet connection for the first start.
   "Windows x86_64 - plugin API 3 - scsynth+supernova". Prebuilt plugins are chosen by this.
 
 Nothing in the window makes SuperCollider wait. While a package is being installed
-its row says "working..." and its buttons are off; you can keep browsing.
+its row says "working…" and its buttons are off; you can keep browsing.
 
 ## 4. Find a package
 
@@ -110,19 +110,24 @@ details pane):
 |---|---|
 | `PLUGIN` | A compiled plugin for the sound server, with the small class files that let you use it in code. |
 | `QUARK` | SuperCollider code only (classes, help). Nothing is compiled. |
-| `PLUGIN + QUARK` | A compiled plugin plus a larger library of SuperCollider code. |
+| `PLUGIN + QUARK` | A compiled plugin plus a larger library of SuperCollider code (none of the pictures here shows one). |
 
 **Status** (the last column):
 
 | Status | Meaning |
 |---|---|
-| `reviewed - prebuilt` | A maintainer reviewed this exact version, and there is a ready-made download for your computer. |
-| `reviewed - build locally` | Reviewed, but no download for your computer: sc-deken builds it here. |
+| `reviewed · prebuilt` | A maintainer reviewed this exact version, and there is a ready-made download for your computer. |
+| `reviewed · build locally` | Reviewed, but no download for your computer: sc-deken builds it here. |
+| `reviewed` | Reviewed. This is all a row says until you select it; the details pane then adds how it will be installed. |
 | `community-listed` | A quark from SuperCollider's official quarks list. |
-| `unreviewed` (with a warning sign) | Found automatically. Nobody has looked at it. See [section 8](#8-unreviewed-packages). |
+| `⚠ unreviewed · build locally` (plugins) or `⚠ unreviewed` (quarks) | Found automatically. Nobody has looked at it. See [section 8](#8-unreviewed-packages). |
 | `update available` | You have it, and a newer version exists. |
-| `retracted` (red) | Withdrawn because of malware, a serious problem or a dangerous bug. See [section 11](#11-withdrawn-packages). |
-| `working...` | An install, update or removal is running. |
+| `installed` | You have it, and sc-deken has no further information about it (for example a copy you put there by hand). |
+| `⛔ retracted` (red) | Withdrawn because of malware, a serious problem or a dangerous bug. See [section 11](#11-withdrawn-packages). |
+| `working…` | An install, update or removal is running. |
+
+A package you have installed does not get its own badge in *Browse*; select it and the
+details pane offers **Remove** instead of **Install**, or look on the *Installed* page.
 
 ## 6. Install a package
 
@@ -147,13 +152,13 @@ The package is now listed under *Installed*, and its button changes to **Remove*
 
 ![The package is installed](screenshots/10-installed-now.png)
 
-**Quarks** are installed by SuperCollider itself, exactly as if you had used
-`Quarks.install`; they show up in the Quarks window too.
+**Quarks** are installed through SuperCollider's own Quarks system, pinned to the commit the reviewers approved; they
+show up in the Quarks window too.
 
 **Needs.** Some quarks need other quarks. The details pane lists them, and
 sc-deken installs them first.
 
-![Mitola needs Panola](screenshots/04-quarks.png)
+![Mitola needs Scparco](screenshots/04-quarks.png)
 
 **Versions.** The *Version* box lists the versions that are available. The newest
 is chosen. Pick an older one if you need it.
@@ -161,7 +166,7 @@ is chosen. Pick an older one if you need it.
 ## 7. When a package has to be built on your computer
 
 Some plugins have no ready-made download for your computer. The status says
-`reviewed - build locally` and the pane explains why.
+`reviewed · build locally` and the pane explains why.
 
 ![A plugin that will be built here](screenshots/03-local-build.png)
 
@@ -249,7 +254,7 @@ Sometimes a package turns out to be a problem: it contains malware, a serious se
 hole, or a bug that can crash your computer or lose your work. The maintainers can
 **withdraw** it, which means:
 
-- It is shown in red as `retracted`, and the Install button is off for the withdrawn
+- It is shown in red as `⛔ retracted`, and the Install button is off for the withdrawn
   version.
 
   ![A withdrawn package](screenshots/06-withdrawn.png)
@@ -280,7 +285,7 @@ You decide what happens. **Nothing is removed without your permission.**
 
 - **Keep** leaves the package alone and remembers your choice so you are not asked at
   every start. For malware you are asked a second time. A kept package is still marked
-  `retracted` in the lists.
+  `⛔ retracted` in the lists.
 
   ![Keeping malware needs a second yes](screenshots/advisory-keep.png)
 
@@ -353,7 +358,8 @@ carries on with the saved copy.
 
 **The package list could not be verified.** sc-deken refuses a list whose signature
 does not match, and keeps using the last good copy. If it persists, update sc-deken
-(`Quarks.update("Deken")` and recompile).
+(`Quarks.update("scdeken");` and recompile; the quark is named after its address,
+`https://github.com/shimpe/scdeken`).
 
 **"Some tools are missing" for a local build.** Install what the dialog names, press
 *Check again*. If a tool is installed but not found, restart SuperCollider so it picks up
@@ -364,7 +370,16 @@ not support your SuperCollider or compiler version. Copy the log when you ask th
 author for help, and mention your platform line from the bottom of the window.
 
 **The helper cannot be downloaded or fails its checksum.** sc-deken will not run a helper
-it could not verify. Check your internet connection and any firewall;
+it could not verify. Check your internet connection and any firewall, then try again.
+
+**Antivirus software gets in the way** (for example Norton on Windows). It can hold or
+quarantine a freshly downloaded `scdeken` helper (a new program it has never seen), or
+block git for a moment while it writes files, which shows up as `Permission denied` or
+`failed to write object` in the Build log. Simply try again; the files already fetched are
+kept. If it keeps happening, tell your antivirus to allow the folders SuperCollider keeps
+its sc-deken files in: the `sc-deken` folder inside `Platform.userAppSupportDir` and the
+`sc-deken` folder inside `Platform.userExtensionDir` (evaluate both in SuperCollider to see
+where they are). Only do this for folders you recognise.
 
 **I want my old copy back after "Replace".** The old copy is in the `backup` folder inside
 `Platform.userAppSupportDir +/+ "sc-deken"`.

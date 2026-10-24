@@ -52,7 +52,7 @@ flowchart LR
 ```
 
 A merge to `main` of the recipes repository **is the approval**. That is why
-branch protection on `main` is not optional (see section 7 of the recipes README).
+branch protection on `main` is not optional (step 6, "Branch protection", in the recipes README's setup list).
 
 ## 3. Recipes
 
@@ -125,7 +125,7 @@ A recipe merge means "I read this and I accept running it on users' computers". 
   come from places you trust;
 - the license is right, and the packed archive will contain the license file;
 - the PR build is green on every platform you care about. A platform that fails gets no
-  prebuilt download and is built locally by users (they see "reviewed - build locally").
+  prebuilt download and is built locally by users (they see "reviewed · build locally").
   That does not block the merge.
 
 ## 5. Approving versions
@@ -188,7 +188,7 @@ legitimate package does real harm.
 What users see:
 
 - The withdrawn version leaves the installable list at once, and is shown in red as
-  `retracted`. Installing a `malware` version is refused; for `vulnerable` and `broken`
+  `⛔ retracted`. Installing a `malware` version is refused; for `vulnerable` and `broken`
   the user can install it after a warning.
 
   ![Withdrawn package in the window](screenshots/06-withdrawn.png)

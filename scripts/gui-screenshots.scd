@@ -8,7 +8,7 @@
 // the helper and the signed index. Everything the screenshots show is real
 // except the advisory dialogs and the "Removed" dialog, which are shown with
 // made-up findings, and the downloads, which are one placeholder file.
-// Needs the network once: Panola and Scparco are installed as real quarks.
+// Needs the network once: Panola and Phijack are installed as real quarks.
 //
 // Afterwards run scripts/optimize-screenshots.sh to shrink the PNGs.
 (
@@ -38,6 +38,8 @@ var select = { |g, name|
 	3.wait;
 };
 var chip = { |g, i| g.kindButtons[i].valueAction = 1; 2.wait };
+// The window is made as high as the page needs, so the pictures have no empty area.
+var size = { |g, height| g.window.bounds = g.window.bounds.height_(height); 1.5.wait };
 var tryInstall = { |name, version|
 	var done = false, result;
 	4.do { |attempt|
@@ -62,12 +64,12 @@ var main = {
 	LanguageConfig.includePaths.copy.do { |p| LanguageConfig.removeIncludePath(p) };
 
 	// What is already installed on this "computer": three plugins, one of them an
-	// older version (so there is an update), and two quarks (not Panola, so that
-	// Mitola can show that it brings Panola along).
+	// older version (so there is an update), and two quarks (not Scparco, so that
+	// Mitola can show that it brings Scparco along).
 	tryInstall.value("portedplugins", "0.4.1");
 	tryInstall.value("f0plugins", nil);
 	tryInstall.value("XPlayBuf", nil);
-	tryInstall.value("Scparco", nil);
+	tryInstall.value("Panola", nil);
 	tryInstall.value("Phijack", nil);
 
 	g = DekenGui.new.front;
@@ -76,22 +78,26 @@ var main = {
 
 	// 1. Browse: the whole list, a prebuilt plugin selected
 	select.value(g, "vb_UGens");
+	size.value(g, 530);
 	shot.value(g.window, "01-browse");
 
 	// 2. Search: "fm" finds packages by name, summary and UGen name
 	search.value(g, "fm");
 	select.value(g, "sc3-plugins");
+	size.value(g, 400);
 	shot.value(g.window, "02-search");
 
 	// 3. A plugin that has no prebuilt download: built on this computer
 	search.value(g, "nome6");
 	select.value(g, "nome6");
+	size.value(g, 400);
 	shot.value(g.window, "03-local-build");
 
 	// 4. Quarks only, with one that needs another quark
 	search.value(g, "");
 	chip.value(g, 2);
 	select.value(g, "Mitola");
+	size.value(g, 400);
 	shot.value(g.window, "04-quarks");
 	chip.value(g, 0);
 
@@ -99,11 +105,13 @@ var main = {
 	g.unreviewedBox.valueAction = true;
 	search.value(g, "dronepad");
 	select.value(g, "dronepad-ugens");
+	size.value(g, 420);
 	shot.value(g.window, "05-unreviewed");
 
 	// 6. A withdrawn package
 	search.value(g, "SampleHarvest");
 	select.value(g, "SampleHarvest");
+	size.value(g, 420);
 	shot.value(g.window, "06-withdrawn");
 	g.unreviewedBox.valueAction = false;
 	search.value(g, "");
@@ -112,12 +120,14 @@ var main = {
 	g.sidebar.valueAction = 1;
 	3.wait;
 	select.value(g, "portedplugins");
+	size.value(g, 420);
 	shot.value(g.window, "07-installed");
 
 	// 8. Updates
 	g.sidebar.valueAction = 2;
 	3.wait;
 	select.value(g, "portedplugins");
+	size.value(g, 400);
 	shot.value(g.window, "08-updates");
 	g.sidebar.valueAction = 0;
 	2.wait;
@@ -127,6 +137,7 @@ var main = {
 	select.value(g, "vb_UGens");
 	g.perform(\prInstall, "vb_UGens", nil);
 	0.2.wait;
+	size.value(g, 400);
 	shot.value(g.window, "09-working");
 	// The install may take a while (virus scanners); wait for the "Installed" window.
 	waited = 0;
@@ -135,6 +146,7 @@ var main = {
 	shotDialog.value(Window.allWindows.last, "dialog-installed", 150);
 	Window.allWindows.last.close;
 	2.wait;
+	size.value(g, 400);
 	shot.value(g.window, "10-installed-now");
 
 	// 10. Removing
@@ -187,9 +199,11 @@ var main = {
 	].do { |line| logObj.add(line) };
 	g.sidebar.valueAction = 3;
 	2.wait;
+	size.value(g, 260);
 	shot.value(g.window, "11-build-log");
 	g.sidebar.valueAction = 4;
 	2.wait;
+	size.value(g, 300);
 	shot.value(g.window, "12-settings");
 	g.window.close;
 
@@ -200,12 +214,12 @@ var main = {
 		extra.keysValuesDo { |k, v| p[k.asString] = v };
 		p
 	};
-	DekenDialogs.confirm(plan.value("XPlayBuf", "0.1.3", ["duplicates"],
-		(duplicates: [Dictionary.newFrom(["path", "C:/Users/musician/AppData/Local/SuperCollider/Extensions/XPlayBuf", "matched", "plugin file"])])), {});
+	DekenDialogs.confirm(plan.value("DriftVerb", "0.2.0", ["duplicates"],
+		(duplicates: [Dictionary.newFrom(["path", "C:/Users/musician/AppData/Local/SuperCollider/Extensions/DriftVerb", "matched", "plugin file"])])), {});
 	1.5.wait;
 	shotDialog.value(Window.allWindows.last, "dialog-duplicates", 215);
 	Window.allWindows.last.close;
-	DekenDialogs.confirm(plan.value("XPlayBuf", "0.1.3", ["retracted"],
+	DekenDialogs.confirm(plan.value("DriftVerb", "0.2.0", ["retracted"],
 		(retraction: Dictionary.newFrom(["id", "SCD-2026-0004", "severity", "vulnerable", "summary", "Reads past the end of a buffer when the loop length is zero, which can crash the server."]))), {});
 	1.5.wait;
 	shotDialog.value(Window.allWindows.last, "dialog-withdrawn-install", 240);
@@ -225,7 +239,7 @@ var main = {
 	shotDialog.value(Window.allWindows.last, "advisory-malware", 345);
 	Window.allWindows.last.close;
 	DekenAdvisoryDialog.show(hit.value("vulnerable", "Reads past the end of a buffer when the loop length is zero, which can crash the server.",
-		"0.1.4", "XPlayBuf", "0.1.3", "plugin", "C:/Users/musician/AppData/Local/SuperCollider/Extensions/sc-deken/XPlayBuf"), {});
+		"0.2.1", "DriftVerb", "0.2.0", "plugin", "C:/Users/musician/AppData/Local/SuperCollider/Extensions/sc-deken/DriftVerb"), {});
 	1.5.wait;
 	shotDialog.value(Window.allWindows.last, "advisory-vulnerable", 345);
 	Window.allWindows.last.close;
@@ -239,6 +253,7 @@ var main = {
 	shotDialog.value(Window.allWindows.last, "dialog-removed", 230);
 	Window.allWindows.last.close;
 };
+if(fixtures.isNil) { "ERROR: run this through scripts/run-sclang-tests.sh (SCDEKEN_SCRIPT=<this file>): the fixtures are missing".postln; 1.exit };
 SystemClock.sched("SCDEKEN_WATCHDOG".getenv.asFloat, { "RESULT: watchdog timeout".postln; 1.exit });
 fork({
 	try { main.value; "RESULT: screenshots done".postln; 0.exit } { |err| err.reportError; "RESULT: screenshots failed".postln; 1.exit }

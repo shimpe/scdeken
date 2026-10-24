@@ -44,11 +44,11 @@ what has to be done afterwards (recompile, reboot the server), which version you
 get, and how it will be installed: a prebuilt download or a build on this
 computer.
 
-![A plugin without a prebuilt download: "reviewed - build locally"](docs/screenshots/03-local-build.png)
+![A plugin without a prebuilt download: "reviewed · build locally"](docs/screenshots/03-local-build.png)
 
 **Quarks that need other quarks bring them along.**
 
-![Mitola needs Panola; the details pane says it will be installed too](docs/screenshots/04-quarks.png)
+![Mitola needs Scparco; the details pane says it will be installed too](docs/screenshots/04-quarks.png)
 
 **Missing build tools are named, with the command to install them.**
 
@@ -63,6 +63,7 @@ commit that would be built.
 **Installed packages, updates and the build log.**
 
 ![The Installed page, with an update waiting for portedplugins](docs/screenshots/07-installed.png)
+![The build log of a local build](docs/screenshots/11-build-log.png)
 
 **Withdrawn packages are flagged.** If maintainers withdraw a package or version
 (malware, a serious vulnerability, or a dangerous bug), sc-deken tells you when you

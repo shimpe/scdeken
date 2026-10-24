@@ -16,7 +16,7 @@ help_images="01-browse 02-search 03-local-build 07-installed dialog-doctor advis
 
 cd "$repo/docs/screenshots"
 for f in *.png; do
-	magick "$f" -dither None -colors 256 -strip "PNG8:$f.tmp" && mv "$f.tmp" "$f"
+	magick "$f" -resize '1200x>' -dither None -colors 256 -strip "PNG8:$f.tmp" && mv "$f.tmp" "$f"
 done
 
 mkdir -p "$repo/HelpSource/Guides/images"
