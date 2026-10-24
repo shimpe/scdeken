@@ -225,6 +225,7 @@ func (g gatherer) releases(ctx context.Context, repo string, in *indexer.Inputs)
 	in.Sums, in.Files = map[string]map[string]string{}, map[string]map[string][]string{}
 	for _, rel := range all {
 		isNewest, wanted := newest[rel.Tag]
+		wanted = wanted && !rel.Draft
 		if !wanted {
 			continue
 		}

@@ -70,7 +70,7 @@ func (b *builder) isMalware(r recipe.Recipe, v, commit string) bool {
 func (b *builder) builds(tag string) []index.Build {
 	var out []index.Build
 	for _, rel := range b.in.Releases {
-		if rel.Tag != tag {
+		if rel.Tag != tag || rel.Draft {
 			continue
 		}
 		for _, a := range rel.Assets {

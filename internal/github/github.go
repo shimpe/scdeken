@@ -40,6 +40,7 @@ type Asset struct {
 // Release is a tagged GitHub release with its files.
 type Release struct {
 	Tag    string
+	Draft  bool // unpublished; the indexer ignores it
 	Assets []Asset
 }
 
@@ -128,6 +129,7 @@ func (j repoJSON) repo() Repo {
 
 type releaseJSON struct {
 	Tag    string `json:"tag_name"`
+	Draft  bool   `json:"draft"`
 	Assets []struct {
 		Name string `json:"name"`
 		URL  string `json:"browser_download_url"`
@@ -136,7 +138,7 @@ type releaseJSON struct {
 }
 
 func (j releaseJSON) release() Release {
-	r := Release{Tag: j.Tag}
+	r := Release{Tag: j.Tag, Draft: j.Draft}
 	for _, a := range j.Assets {
 		r.Assets = append(r.Assets, Asset{Name: a.Name, URL: a.URL, Size: a.Size})
 	}

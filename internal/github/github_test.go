@@ -44,14 +44,14 @@ func TestReleases(t *testing.T) {
 		if r.URL.Path != "/repos/a/one/releases" {
 			t.Errorf("path = %s", r.URL.Path)
 		}
-		fmt.Fprint(w, `[{"tag_name":"v1","assets":[{"name":"x.zip","browser_download_url":"https://e/x.zip","size":42}]}]`)
+		fmt.Fprint(w, `[{"tag_name":"v1","assets":[{"name":"x.zip","browser_download_url":"https://e/x.zip","size":42}]},{"tag_name":"v2","draft":true}]`)
 	}))
 	defer srv.Close()
 	rels, err := (&Client{BaseURL: srv.URL}).Releases(context.Background(), "a/one")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rels) != 1 || rels[0].Tag != "v1" || rels[0].Assets[0] != (Asset{"x.zip", "https://e/x.zip", 42}) {
+	if len(rels) != 2 || rels[0].Draft || !rels[1].Draft || rels[0].Tag != "v1" || rels[0].Assets[0] != (Asset{"x.zip", "https://e/x.zip", 42}) {
 		t.Fatalf("rels = %+v", rels)
 	}
 }

@@ -136,6 +136,19 @@ func TestBuildSkipsAssetWithoutSum(t *testing.T) {
 	}
 }
 
+func TestBuildIgnoresDraftReleases(t *testing.T) {
+	draft := releaseWithAsset("fmx6-0.3.0", "linux-x86_64-api3.zip")
+	draft.Draft = true
+	ix := build(t, &fakeScanner{}, Inputs{
+		Recipes:  []recipe.Recipe{fmxRecipe()},
+		Releases: []github.Release{draft},
+		Sums:     map[string]map[string]string{"fmx6-0.3.0": {"linux-x86_64-api3.zip": "aa"}},
+	})
+	if got := pkgNamed(t, ix, "fmx6").Versions[0].Builds; len(got) != 0 {
+		t.Errorf("draft release produced builds: %+v", got)
+	}
+}
+
 func TestBuildMalwareVersionHasNoBuilds(t *testing.T) {
 	ix := build(t, &fakeScanner{}, Inputs{
 		Recipes: []recipe.Recipe{fmxRecipe()},
