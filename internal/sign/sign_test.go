@@ -98,3 +98,19 @@ func TestTrustedStore(t *testing.T) {
 		t.Fatalf("Trusted = %v, %v", keys, err)
 	}
 }
+
+func TestAddTrustedWithoutTrailingNewline(t *testing.T) {
+	store := filepath.Join(t.TempDir(), "trusted_keys")
+	oldKey, _ := newKey(t)
+	newK, _ := newKey(t)
+	if err := os.WriteFile(store, []byte(oldKey), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := AddTrusted(store, []string{newK}); err != nil {
+		t.Fatalf("AddTrusted: %v", err)
+	}
+	keys, err := Trusted("", store)
+	if err != nil || len(keys) != 2 || keys[0] != oldKey || keys[1] != newK {
+		t.Fatalf("Trusted = %v, %v", keys, err)
+	}
+}

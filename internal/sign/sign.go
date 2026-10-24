@@ -62,13 +62,25 @@ func Trusted(embedded, storePath string) ([]string, error) {
 	if embedded != "" {
 		keys = append(keys, embedded)
 	}
-	data, err := os.ReadFile(storePath)
-	if errors.Is(err, os.ErrNotExist) {
-		return keys, nil
-	}
+	data, err := readStore(storePath)
 	if err != nil {
+		return nil, err
+	}
+	return append(keys, parseKeys(data)...), nil
+}
+
+// readStore returns the raw store file; a missing file is empty, not an error.
+func readStore(storePath string) ([]byte, error) {
+	data, err := os.ReadFile(storePath)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, fmt.Errorf("read trusted keys %s: %w", storePath, err)
 	}
+	return data, nil
+}
+
+// parseKeys returns the key lines, skipping blanks and comments.
+func parseKeys(data []byte) []string {
+	var keys []string
 	for _, line := range strings.Split(string(data), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "untrusted comment:") {
@@ -76,21 +88,25 @@ func Trusted(embedded, storePath string) ([]string, error) {
 		}
 		keys = append(keys, line)
 	}
-	return keys, nil
+	return keys
 }
 
 // AddTrusted appends to the store file every key that is not already in it,
 // creating the file and its folder if needed.
 func AddTrusted(storePath string, keys []string) error {
-	existing, err := Trusted("", storePath)
+	data, err := readStore(storePath)
 	if err != nil {
 		return err
 	}
 	known := map[string]bool{}
-	for _, k := range existing {
+	for _, k := range parseKeys(data) {
 		known[k] = true
 	}
 	var add strings.Builder
+	if len(data) > 0 && data[len(data)-1] != '\n' {
+		add.WriteString("\n") // a hand-edited file may lack a final newline
+	}
+	start := add.Len()
 	for _, k := range keys {
 		k = strings.TrimSpace(k)
 		if k != "" && !known[k] {
@@ -98,7 +114,7 @@ func AddTrusted(storePath string, keys []string) error {
 			add.WriteString(k + "\n")
 		}
 	}
-	if add.Len() == 0 {
+	if add.Len() == start {
 		return nil
 	}
 	if err := os.MkdirAll(filepath.Dir(storePath), 0o755); err != nil {
