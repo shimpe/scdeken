@@ -116,3 +116,15 @@ func TestMajorMinor(t *testing.T) {
 		t.Errorf("Major, Minor = %d, %d; want 7, 0", v.Major(), v.Minor())
 	}
 }
+
+func TestIsPrerelease(t *testing.T) {
+	for text, want := range map[string]bool{"3.13.0": false, "3.14.0-rc1": true, "3.15.0-dev": true, "0.0.0+abc1234": false} {
+		v, err := Parse(text)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if v.IsPrerelease() != want {
+			t.Errorf("IsPrerelease(%q) = %v, want %v", text, !want, want)
+		}
+	}
+}

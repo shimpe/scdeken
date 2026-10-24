@@ -181,3 +181,7 @@ func Max(vs []Version) (best Version, ok bool) {
 	}
 	return best, ok
 }
+
+// IsPrerelease reports whether the version has a "-prerelease" suffix such as
+// "-rc1" or "-dev".
+func (v Version) IsPrerelease() bool { return len(v.pre) > 0 }
