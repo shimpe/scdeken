@@ -56,6 +56,14 @@ flowchart LR
 A merge to `main` of the recipes repository **is the approval**. That is why
 branch protection on `main` is not optional (step 6, "Branch protection", in the recipes README's setup list).
 
+`main` of shimpe/scdeken-recipes is protected by a ruleset: no force pushes, no
+deletion, no bypass, and every change arrives through a pull request whose
+`pr-build-result` check passed. That holds for every file, a typo in the README
+included: push a branch, open a pull request, merge when the check is green. While
+there is one maintainer the ruleset asks for 0 approvals (GitHub does not let you
+approve your own pull request); with a second maintainer it should require 1
+approval from Code Owners.
+
 ## 3. Recipes
 
 A recipe is a TOML file in `recipes/`, named after the package. It is data, never
@@ -499,6 +507,15 @@ from real-time scanning may help.
 add-package or tag-bot job could not open its pull request. Tick the setting described in
 [Letting workflows open pull requests](#letting-workflows-open-pull-requests) in that
 repository, then run the job again (for a release: **Re-run failed jobs** on its run).
+
+**A push to `main` of the recipes repository is rejected** (`GH013: Repository rule
+violations found`, "Changes must be made through a pull request"). That is the branch
+protection working. Push the change to a branch and open a pull request instead.
+
+**The merge button stays grey: "Required status check `pr-build-result` is expected".**
+The PR build has not run for this pull request. Either it waits for approval (open the
+**Checks** tab and approve the run) or nothing started it (a bot's pull request, see the
+next entry). Closing and reopening the pull request starts it.
 
 **Pull requests created by the bot do not start the PR build.** That is GitHub's rule
 for pull requests created with the default token. Set the optional `BOT_TOKEN` secret as described in the recipes README
