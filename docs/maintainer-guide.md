@@ -224,6 +224,12 @@ scdeken index keygen --out-dir <secure folder>
 
 This writes `scdeken.pub` (public) and `scdeken.key` (password-protected secret).
 
+On Windows, quote a folder name that contains spaces and leave out the trailing
+backslash: `--out-dir 'C:\Users\me\signing keys'`, not `'C:\Users\me\signing keys\'`.
+A backslash right before the closing quote turns the quote into text, and anything after
+it on the line (such as `--password-env`) becomes part of the folder name. scdeken drops
+a lone quote at the end of a value, and refuses the joined form with this explanation.
+
 1. Create a GitHub *environment* called `release` in the recipes repository and restrict
    it to the `main` branch **before** adding anything to it. Then store the **secret** key
    as its secret `SCDEKEN_SIGNING_KEY` and the password as `SCDEKEN_SIGNING_PASSWORD`
