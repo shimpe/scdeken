@@ -64,10 +64,6 @@ checks it against a checksum that came with the quark. The window opens at once;
 the package list appears when the helper is ready. You need SuperCollider 3.13
 or newer, and an internet connection for the first start.
 
-> The first public release is still being prepared. Until the official package
-> list and the helper download are published, the window cannot fill itself
-> from the internet.
-
 ## 3. The window
 
 ![The Browse page](screenshots/01-browse.png)

@@ -26,10 +26,11 @@ The first time you use it, Deken downloads a small helper program (`scdeken`)
 and checks it against a checksum that ships with the quark. SuperCollider 3.13
 or newer is needed. Windows, macOS and Linux are supported.
 
-Status: the first public release is being prepared. Until the signed package list
-and the first helper release are published (see the
-[maintainer guide](docs/maintainer-guide.md)), the window cannot fill itself from
-the internet. The screenshots below use a made-up but realistic package list.
+Status: the first release (v0.1.0) is out. The signed package list is rebuilt
+every day and lists about 390 packages: reviewed ones with a recipe, the quarks
+of the official quarks directory, and (hidden unless you ask) unreviewed ones
+found on GitHub. The screenshots below show real packages, except for one
+unreviewed and one withdrawn package that were made up for the pictures.
 
 ## A quick tour
 
@@ -159,8 +160,9 @@ scripts/run-sclang-tests.sh            # all UnitTests under classes/tests
 To use a helper you built yourself instead of the downloaded one, set
 `Deken.helperPath = "/path/to/scdeken";` before opening the window.
 
-The screenshots in `docs/screenshots` are produced by a script against a made-up
-but realistic package list; see `scripts/gui-screenshots.scd`:
+The screenshots in `docs/screenshots` are produced by a script against a small
+signed copy of the package list (see `scripts/make-doc-index.sh` and
+`scripts/gui-screenshots.scd`):
 
 ```text
 SCDEKEN_SCRIPT=$PWD/scripts/gui-screenshots.scd scripts/run-sclang-tests.sh
