@@ -7,7 +7,7 @@
 // talks to the helper; the buttons call the actions passed to `new`:
 // install, update, remove (each gets name and version) and versionChanged.
 DekenDetailsView {
-	classvar <width = 280;
+	classvar <width = 280, shownPlugins = 5;
 	var actions;
 	var <view;
 	var chip, nameLabel, byline, summary, inside, after, needs, versionMenu, badge, route;
@@ -97,13 +97,17 @@ DekenDetailsView {
 
 	// ---- what to show (pure)
 
-	// Server plugins by name with the engines they run on, UGen class count,
-	// sclang library size. package is the index entry.
+	// Server plugins by name with the engines they run on (the first few; a long
+	// list ends in a count), UGen class count, sclang library size. package is
+	// the index entry.
 	*insideLines { |pkg|
 		var lines = this.pluginLines(pkg["plugin_files"] ? []);
 		var ugens = pkg["ugens"] ? [];
 		var library = (pkg["classes"] ? []).reject { |c| ugens.indexOfEqual(c).notNil };
 		var count = library.size;
+		if(lines.size > (shownPlugins + 1)) {
+			lines = lines.keep(shownPlugins) ++ ["… and % more server plugins".format(lines.size - shownPlugins)]
+		};
 		if(ugens.notEmpty) { lines = lines ++ ["UGen classes: " ++ ugens.size] };
 		lines = lines ++ [if(library.isEmpty) { "sclang library: none" } { "sclang library: % %".format(count, if(count == 1) { "class" } { "classes" }) }];
 		^lines
@@ -173,6 +177,7 @@ DekenDetailsView {
 	// ---- building
 
 	prBuild {
+		var facts;
 		busy = false;
 		versionNames = [];
 		chip = StaticText().align_(\center).font_(Font(size: 10, bold: true)).stringColor_(DekenStyle.chipText).maxWidth_(130).fixedHeight_(18);
@@ -190,15 +195,20 @@ DekenDetailsView {
 		removeButton = Button().states_([["Remove"]]).action_({ actions[\remove].value(row[\name]) });
 		repoButton = Button().states_([["Repo ↗"]]).action_({ package !? { |p| p["repo"].openOS } });
 		suggestButton = Button().states_([["Suggest for review"]]).action_({ package !? { |p| DekenStyle.suggestURL(p["repo"]).openOS } });
-		view = View().fixedWidth_(width).layout_(VLayout(
+		// The facts scroll, so a long summary or list of needs can't make the
+		// window taller than the screen; the version and buttons stay below.
+		facts = View().layout_(VLayout(
 			chip, nameLabel, byline, summary,
 			this.prHeading("What's inside"), inside, needs,
 			this.prHeading("After installing"), after,
+			nil
+		).margins_(0).spacing_(3)).background_(Color.grey(0.98));
+		view = View().fixedWidth_(width).layout_(VLayout(
+			ScrollView().canvas_(facts).hasBorder_(false).hasHorizontalScroller_(false),
 			this.prHeading("Version"), versionMenu,
 			badge, route,
 			HLayout(installButton, updateButton, removeButton, repoButton),
-			suggestButton,
-			nil
+			suggestButton
 		).margins_(8).spacing_(3)).background_(Color.grey(0.98));
 		chip.visible = false;
 		[installButton, updateButton, removeButton, repoButton, suggestButton, versionMenu].do { |b| b.enabled = false };

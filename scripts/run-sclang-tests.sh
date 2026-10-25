@@ -24,7 +24,7 @@ sclang="$sc_home/sclang.exe"
 [ -x "$sclang" ] || sclang="$(command -v sclang)"
 
 if [ -n "${SCDEKEN_PROFILE:-}" ]; then
-	profile="$SCDEKEN_PROFILE"; mkdir -p "$profile"
+	profile="$SCDEKEN_PROFILE"; mkdir -p "$profile"; profile="$(cd "$profile" && pwd)"
 else
 	profile="$(mktemp -d)"; trap 'rm -rf "$profile"' EXIT
 fi
@@ -78,8 +78,15 @@ export SCDEKEN_FIXTURES="$(native "$profile/fixtures")"
 export SCDEKEN_PROFILE="$(native "$profile")"
 export SCDEKEN_WATCHDOG=$(( ${SCDEKEN_TIMEOUT:-300} - 10 ))
 export LOCALAPPDATA="$(command -v cygpath >/dev/null && cygpath -w "$profile" || echo "$profile")" # belt and braces
+script="${SCDEKEN_SCRIPT:-$profile/run.scd}"
+case "$script" in /* | [A-Za-z]:*) ;; *) script="$PWD/$script" ;; esac
+# SuperCollider's Git runs "cd <quark folder> && git ..." through cmd.exe,
+# whose cd does not change drive: started from D: with the profile on C:, git
+# would run in whatever repository sclang was started in. So start sclang in
+# the profile, on the same drive as the quarks folder.
+cd "$profile"
 set +e
 timeout "${SCDEKEN_TIMEOUT:-300}" "$sclang" -l "$(native "$profile/sclang_conf.yaml")" \
-	"$(native "${SCDEKEN_SCRIPT:-$profile/run.scd}")" "${tests[@]}" </dev/null 2>&1 | tee "$profile/last-run.log"
+	"$(native "$script")" "${tests[@]}" </dev/null 2>&1 | tee "$profile/last-run.log"
 rc=${PIPESTATUS[0]}
 exit "$rc"

@@ -12,6 +12,36 @@ TestDekenDetailsView : UnitTest {
 			["Server plugin: FMX6 (scsynth)", "UGen classes: 1", "sclang library: none"], "UGen wrappers are not library classes");
 	}
 
+	// sc3-plugins has 171 server plugins: listing them all made the window taller than the screen.
+	test_insideLinesShortenALongPluginList {
+		var files = (1..171).collect { |i| "P%.scx".format(i) };
+		var lines = DekenDetailsView.insideLines(Dictionary.newFrom(["plugin_files", files]));
+		this.assertEquals(lines.size, 7, "5 plugins, the rest as a count, the library line");
+		this.assertEquals(lines[4], "Server plugin: P5 (scsynth)");
+		this.assertEquals(lines[5], "… and 166 more server plugins");
+		this.assertEquals(DekenDetailsView.insideLines(Dictionary.newFrom(["plugin_files", files.keep(6)])).size, 7,
+			"six are all listed: \"and 1 more\" saves nothing");
+	}
+
+	// Whatever the package lists, the pane never asks for more height than a screen has.
+	test_paneHeightStaysBounded {
+		var files = (1..171).collect { |i| "P%.scx".format(i) };
+		var depends = Dictionary.new, height, done = Condition.new;
+		60.do { |i| depends["Dep" ++ i] = "*" };
+		{
+			var pane = DekenDetailsView((install: {}, update: {}, remove: {}, versionChanged: {}));
+			pane.show((name: "sc3-plugins", kind: "plugin", summary: "Community plugins", trust: "reviewed"));
+			pane.fill(Dictionary.newFrom(["package", Dictionary.newFrom(["plugin_files", files, "depends", depends,
+				"summary", "Community plugins", "versions", [Dictionary.newFrom(["version", "3.13.0"])]])]));
+			height = pane.view.minSizeHint.height;
+			pane.view.remove;
+			done.test = true;
+			done.signal;
+		}.defer;
+		done.wait;
+		this.assert(height < 500, "pane asks for % pixels".format(height));
+	}
+
 	test_insideLinesForAQuark {
 		var pkg = Dictionary.newFrom(["classes", ["Panola", "PanolaPlayer"]]);
 		this.assertEquals(DekenDetailsView.insideLines(pkg), ["sclang library: 2 classes"]);
