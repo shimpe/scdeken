@@ -318,7 +318,9 @@ API (set a token to avoid the anonymous rate limit).
 
 1. Make sure `main` is green (CI runs `go vet`, `gofmt -l`, `go test ./...` on Linux,
    macOS and Windows, plus an end-to-end real plugin build on each).
-2. Make sure `EmbeddedPublicKey` in `internal/sign/key.go` is set (section 7).
+2. Make sure `EmbeddedPublicKey` in `internal/sign/key.go` is set (section 7), and that
+   this repository lets GitHub Actions open pull requests
+   ([Letting workflows open pull requests](#letting-workflows-open-pull-requests)).
 3. Tag and push: `git tag v0.1.0 && git push origin v0.1.0`.
 4. The **Release** workflow cross-compiles `scdeken` for linux (x86_64, arm64), macOS
    (x86_64, arm64) and Windows (x86_64), writes `SHA256SUMS`, creates the GitHub release,
@@ -352,6 +354,45 @@ The sclang unit tests are not part of CI (they need a SuperCollider installation
 | `pr-build.yml` | pull requests | `recipe check` on changed recipes, validates advisories, builds new versions on every platform **without secrets and never from `pull_request_target`**, comments the result per platform. The fixed-name check `pr-build-result` (the one branch protection requires) fails only for recipe or advisory problems. |
 | `publish.yml` | merge to `main`, or by hand (recipe, version) | builds the approved versions; a failed platform is left out and the others are released as `<package>-<version>`; refreshes the index. Only artifacts of planned legs whose job succeeded, holding exactly their zip and file list, are published. |
 | `index.yml` | nightly, on merge, manual | builds the index, signs it in a separate job (the only job with the key), deploys to GitHub Pages; the tag bot opens version PRs and moved-tag issues. |
+
+### Letting workflows open pull requests
+
+Three workflows open pull requests: `release.yml` in the tool repository (the
+`helper-lock.json` update), and `add-package.yml` and the tag bot in `index.yml` in the
+recipes repository. GitHub forbids this until you allow it, **in each of the two
+repositories**:
+
+1. Open the repository on github.com and click **Settings**.
+2. In the left sidebar, click **Actions**, then **General**.
+3. Scroll down to **Workflow permissions**.
+4. Tick **Allow GitHub Actions to create and approve pull requests**.
+5. Click **Save** (the button sits right under this section).
+
+Leave the radio button above it on **Read repository contents and packages
+permissions**. Every workflow asks for the extra rights it needs per job (for example
+`pull-requests: write`), so the default can stay read-only.
+
+The direct address is `https://github.com/<owner>/<repository>/settings/actions`;
+**Workflow permissions** is near the bottom of that page, below *Actions permissions*,
+*Artifact and log retention* and the fork pull request sections. It is not on the
+**Policies** page next to *General*: Actions policies decide who and which events may
+start workflows, and sc-deken needs none (its workflows use `pull_request`, never
+`pull_request_target`, which the default policy blocks on public repositories).
+
+The same setting from a terminal, with the GitHub CLI logged in as an admin (the API
+calls the checkbox `can_approve_pull_request_reviews`):
+
+```text
+gh api -X PUT repos/<owner>/<repository>/actions/permissions/workflow \
+  -f default_workflow_permissions=read -F can_approve_pull_request_reviews=true
+```
+
+If the checkbox is greyed out, a higher-level setting decides it: for a repository owned
+by an organization, enable the same checkbox under the organization's
+**Settings → Actions → General** first.
+
+Without this setting, those jobs fail with
+`GitHub Actions is not permitted to create or approve pull requests`.
 
 ## 10. Trust model in one page
 
@@ -394,6 +435,11 @@ from real-time scanning may help.
 
 **The index workflow cannot sign.** The `release` environment must exist, be limited to
 `main`, and have both secrets. Pull requests never get them, by design.
+
+**`GitHub Actions is not permitted to create or approve pull requests`.** The release,
+add-package or tag-bot job could not open its pull request. Tick the setting described in
+[Letting workflows open pull requests](#letting-workflows-open-pull-requests) in that
+repository, then run the job again (for a release: **Re-run failed jobs** on its run).
 
 **Pull requests created by the bot do not start the PR build.** That is GitHub's rule
 for pull requests created with the default token. Set the optional `BOT_TOKEN` secret as described in the recipes README
