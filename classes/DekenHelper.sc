@@ -83,13 +83,24 @@ DekenHelper {
 		.replace("{ext}", this.exeExtension)
 	}
 
+	// Why no helper can be downloaded for this computer: the lock lists no
+	// checksums at all before the first release, or none for this platform.
+	*missingHelperMessage { |lock|
+		var sums = lock["sha256"];
+		var useOwn = "To use a scdeken you built yourself, enter its path on the Settings page of this window "
+		++ "and open the window again, or set Deken.helperPath.";
+		if(sums.isNil or: { sums.isEmpty }) {
+			^"this copy of the Deken quark is from before the first sc-deken release, so there is no helper "
+			++ "to download yet. Update the quark once a release is out. " ++ useOwn
+		};
+		^"sc-deken % has no helper for this computer (%). ".format(lock["version"], this.platformKey) ++ useOwn
+	}
+
 	*prDownload { |lock, path, onReady, onFail|
 		// Every download has its own file, so nothing else can touch what is hashed.
 		var part = path ++ "." ++ UniqueID.next ++ ".part";
 		var expected = lock["sha256"] !? { |t| t[this.platformKey] };
-		if(expected.isNil) {
-			^this.prFail("this release lists no checksum for " ++ this.platformKey ++ ", so no helper can be downloaded.", onFail)
-		};
+		if(expected.isNil) { ^this.prFail(this.missingHelperMessage(lock), onFail) };
 		this.prMkdirs(this.binDir);
 		this.prShell(this.curlCommand(part, this.downloadURL(lock))) { |exit|
 			if(exit != 0) {

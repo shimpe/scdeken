@@ -398,6 +398,15 @@ package, your platform, your SuperCollider version and the last lines of the log
 before you send it). You can also copy the log when you ask the package's author for help,
 and mention your platform line from the bottom of the window.
 
+**"…from before the first sc-deken release, so there is no helper to download yet"** or
+**"sc-deken x.y.z has no helper for this computer"**. The quark downloads its helper
+program (`scdeken`) from a GitHub release and checks it against the checksum listed in the
+quark. Before the first release, or on a computer the release has no build for, there is
+nothing it could check, so it downloads nothing. Update the quark once a release is out
+(`Quarks.update("scdeken");` and recompile). Or build `scdeken` yourself
+(`go build -o scdeken ./cmd/scdeken` in the sc-deken repository; Go is needed), enter its
+path on the Settings page of the window, and open the window again.
+
 **The helper download stops with "took too long".** sc-deken gives up on a download that
 cannot connect within 30 seconds or takes more than 10 minutes. Check your connection and
 try again.

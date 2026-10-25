@@ -165,6 +165,20 @@ TestDekenHelper : UnitTest {
 		this.assertEquals(url, expected);
 	}
 
+	test_missingHelperBeforeTheFirstRelease {
+		var msg = DekenHelper.missingHelperMessage(Dictionary.newFrom(["version", "0.0.0", "sha256", Dictionary.new]));
+		this.assert(msg.find("before the first sc-deken release").notNil, "says there is no release yet: " ++ msg);
+		this.assert(msg.find("Settings").notNil, "points to the Settings page: " ++ msg);
+		this.assert(msg.find("Deken.helperPath").notNil, "names the code alternative: " ++ msg);
+	}
+
+	test_missingHelperForThisComputer {
+		var msg = DekenHelper.missingHelperMessage(Dictionary.newFrom(["version", "1.2.3", "sha256", Dictionary.newFrom(["plan9-mips", "ab"])]));
+		this.assert(msg.find("1.2.3").notNil, "names the release: " ++ msg);
+		this.assert(msg.find(DekenHelper.platformKey).notNil, "names this computer: " ++ msg);
+		this.assert(msg.find("Settings").notNil, "points to the Settings page: " ++ msg);
+	}
+
 	test_bootstrapDownloadsAndRunsTheHelper {
 		var path, failed, r;
 		Deken.helperPath = nil;
