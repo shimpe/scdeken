@@ -104,7 +104,7 @@ SECTION:: Unreviewed packages
 Unreviewed packages have no prebuilt downloads, so installing one means building code nobody has looked at. Deken asks you to confirm first, and says where the code comes from and which exact version will be used. A plugin runs with all your rights, like any program: only go on if you trust the author. Cancel is the default button, and nothing is installed before you agree.
 
 SECTION:: A copy is already on your computer
-If you put a plugin into your extensions folder by hand earlier, a second copy would cause "duplicate class" errors. Deken looks for existing copies and asks: Replace moves the old copy to a backup folder (it is never deleted) and installs the new one; Keep existing stops and leaves your copy as it is.
+If you put a plugin into your extensions folder by hand earlier, a second copy would cause "duplicate class" errors. Deken looks for existing copies and asks: Replace moves the old copy to a backup folder (it is never deleted, and its files are renamed so they cannot load from there) and installs the new one; Keep existing stops and leaves your copy as it is.
 
 SECTION:: Update and remove
 The Installed page lists everything on your computer, including quarks you installed the old way.
@@ -123,7 +123,7 @@ image::images/advisory-malware.png#A package on your computer was withdrawn::
 You decide what happens. strong::Nothing is removed without your permission.::
 
 list::
-## strong::Remove now:: moves the package to a quarantine folder outside the places SuperCollider loads from. Nothing is deleted, so a false alarm costs you nothing. Afterwards you are asked to recompile the class library (and reboot the server for plugins).
+## strong::Remove now:: moves the package to a quarantine folder outside the places SuperCollider loads from. Its code::.sc::, code::.scx:: and code::.so:: files are renamed to end in code::.disabled::, so it cannot load even if one of your settings points SuperCollider there. Nothing is deleted, so a false alarm costs you nothing. Afterwards you are asked to recompile the class library (and reboot the server for plugins).
 ## strong::Update to x.y.z:: appears when a fixed version exists.
 ## strong::Keep:: leaves the package alone and remembers your choice. For malware you are asked a second time.
 ## strong::Remind me later:: does nothing now and asks again next time.
@@ -167,5 +167,6 @@ definitionlist::
 ## Tools are missing for a local build || Install what the dialog names and press Check again. If a tool is installed but not found, restart SuperCollider so it sees the updated PATH.
 ## A build fails || Open the Build log page and read the last lines. The failure window has a Report this problem button that opens a GitHub issue for the reviewers, filled in with the package, your platform, your SuperCollider version and the last log lines (read it before you send it). On Windows, packages that need extra system libraries (sc3-plugins needs FFTW) may fail to link when built locally; use the prebuilt download there. Copy the log when you ask the package's author for help, and mention the platform line from the bottom of the window.
 ## "plugin API unknown for 3.15.0 — packages will be built on this computer" || A compiled plugin only loads in SuperCollider releases with the same plugin API (3.13 and 3.14 both use API 3). Your SuperCollider is newer than any release the package list knows about, so Deken builds plugins on your computer instead of downloading them. Quarks are not affected. Once the maintainers add your release, the downloads come back after the next package list refresh.
-## Where are my files? || Plugins installed by Deken are in code::Platform.userExtensionDir +/+ "sc-deken":: (one folder per package). The backup and quarantine folders are in code::Platform.userAppSupportDir +/+ "sc-deken"::.
+## Where are my files? || Plugins installed by Deken are in code::Platform.userExtensionDir +/+ "sc-deken":: (one folder per package). The backup and quarantine folders are in code::Platform.userAppSupportDir +/+ "sc-deken"::. Copies in them have their code::.sc::, code::.scx:: and code::.so:: files renamed to end in code::.disabled::; to put one back, remove the package Deken installed, move the folder back, take code::.disabled:: off those names, recompile and reboot the server.
+## "Nothing was moved: the backup (or quarantine) folder ... is inside ..." || One of the folders SuperCollider loads from (an include path in LanguageConfig, or a changed code::Platform.userExtensionDir:: or code::Platform.systemExtensionDir::) contains the sc-deken folder, so a copy moved there would load again. The message names which. Change that setting so it no longer contains code::Platform.userAppSupportDir +/+ "sc-deken"::, recompile and try again.
 ::

@@ -378,12 +378,16 @@ func (s *Service) updateState(change func(*state.State)) error {
 // backup is one existing copy moved aside.
 type backup struct{ orig, dst string }
 
-// backUp moves each duplicate under Backup/<timestamp>/. Nothing is ever
-// deleted. If one cannot be moved, the ones already moved are put back and
-// the error names the path that failed.
+// backUp moves each duplicate under Backup/<timestamp>/ and disables its
+// loadable files (see aside.go). Nothing is ever deleted. If one cannot be
+// moved, the ones already moved are put back and the error names the path
+// that failed.
 func (s *Service) backUp(dups []Duplicate) ([]backup, error) {
 	if len(dups) == 0 {
 		return nil, nil
+	}
+	if err := s.checkOutsideSearchPaths(s.Paths.Backup, "backup"); err != nil {
+		return nil, err
 	}
 	dir := filepath.Join(s.Paths.Backup, time.Now().Format("20060102-150405"))
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -396,17 +400,25 @@ func (s *Service) backUp(dups []Duplicate) ([]backup, error) {
 			err = fmt.Errorf("Couldn't move %s out of the way (%w). It may need administrator rights, or SuperCollider may be using it.", d.Path, err)
 			return nil, errors.Join(err, s.restore(done))
 		}
-		fmt.Fprintf(s.logger(), "Moved your old copy %s to %s\n", d.Path, dst)
 		done = append(done, backup{orig: d.Path, dst: dst})
+		if err := disableTree(dst); err != nil {
+			err = fmt.Errorf("Couldn't disable the files of %s after moving it to %s: %w", d.Path, dst, err)
+			return nil, errors.Join(err, s.restore(done))
+		}
+		fmt.Fprintf(s.logger(), "Moved your old copy %s to %s (its .sc, .scx and .so files end in %s there)\n", d.Path, dst, disabledSuffix)
 	}
 	return done, nil
 }
 
-// restore puts backed-up copies back where they were.
+// restore puts backed-up copies back where they were, enabled again.
 func (s *Service) restore(backups []backup) error {
 	var errs []error
 	for i := len(backups) - 1; i >= 0; i-- {
 		b := backups[i]
+		if err := enableTree(b.dst); err != nil {
+			errs = append(errs, fmt.Errorf("your copy of %s is now in %s, some files still end in %s: %w", b.orig, b.dst, disabledSuffix, err))
+			continue
+		}
 		if err := moveTree(b.dst, b.orig); err != nil {
 			errs = append(errs, fmt.Errorf("your copy of %s is now in %s: %w", b.orig, b.dst, err))
 		}

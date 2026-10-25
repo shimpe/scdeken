@@ -121,7 +121,7 @@ func TestQuarantineMoves(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := filepath.Join(s.Paths.Quarantine, "SCD-2026-0001", "fmx6")
-	if got != want || !exists(filepath.Join(want, "FMX6.scx")) || exists(dir) {
+	if got != want || !exists(filepath.Join(want, "FMX6.scx"+disabledSuffix)) || exists(dir) {
 		t.Errorf("got %s; moved files missing", got)
 	}
 	if len(s.State.Packages) != 0 {

@@ -89,7 +89,10 @@ More pictures and every step in plain words: [docs/user-guide.md](docs/user-guid
 - Unreviewed packages carry no downloads. You can build them locally, after a
   warning that names the repository and the commit.
 - Nothing you own is deleted without asking: replaced copies go to a backup
-  folder and withdrawn packages go to quarantine.
+  folder and withdrawn packages go to quarantine. Both live outside the folders
+  SuperCollider loads from (sc-deken refuses to move anything if a setting makes
+  them part of one), and the moved copies have their `.sc`, `.scx` and `.so` files
+  renamed to end in `.disabled`, so they cannot load from there.
 
 ## From sclang
 

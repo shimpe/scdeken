@@ -482,7 +482,12 @@ Without this setting, those jobs fail with
   The real boundary is human review of the code at every approved commit, so approve
   only packages whose code you have looked at.
 - Withdrawing is fast (a reviewed pull request to `advisories/`), and removal on users'
-  computers always needs their permission and goes to quarantine.
+  computers always needs their permission and goes to quarantine: a folder that
+  must lie outside every folder SuperCollider loads from (sc-deken checks the
+  extension folders and include paths and refuses otherwise), where the package's
+  `.sc`, `.scx` and `.so` files are renamed to end in `.disabled`, so it cannot load
+  even from a search path sc-deken does not know about (such as a custom
+  `ugenPluginsPath`).
 
 Packages run with the rights of the user, as every SuperCollider plugin does today.
 Review is a human judgement, not a sandbox.

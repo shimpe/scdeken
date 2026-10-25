@@ -287,7 +287,7 @@ func TestApplyReplaceBacksUpDuplicate(t *testing.T) {
 	if len(res.BackedUp) != 1 || !strings.HasPrefix(res.BackedUp[0], s.Paths.Backup) {
 		t.Fatalf("BackedUp = %v", res.BackedUp)
 	}
-	got, err := os.ReadFile(filepath.Join(res.BackedUp[0], "FMX6.scx"))
+	got, err := os.ReadFile(filepath.Join(res.BackedUp[0], "FMX6.scx"+disabledSuffix))
 	if err != nil || string(got) != "mine" {
 		t.Errorf("backup content = %q, %v", got, err)
 	}
@@ -448,7 +448,7 @@ func TestApplyBackupAcrossDrivesCopiesThenRemoves(t *testing.T) {
 	if len(res.BackedUp) != 1 {
 		t.Fatalf("BackedUp = %v", res.BackedUp)
 	}
-	for file, want := range map[string]string{"FMX6.scx": "mine", "sub/deep.txt": "deep"} {
+	for file, want := range map[string]string{"FMX6.scx" + disabledSuffix: "mine", "sub/deep.txt": "deep"} {
 		got, err := os.ReadFile(filepath.Join(res.BackedUp[0], filepath.FromSlash(file)))
 		if err != nil || string(got) != want {
 			t.Errorf("%s = %q, %v", file, got, err)
@@ -553,7 +553,7 @@ func TestApplyQuarkReplaceBacksUpDuplicate(t *testing.T) {
 	if err != nil || res.Kept {
 		t.Fatalf("res = %+v err = %v", res, err)
 	}
-	if exists(dup) || len(res.BackedUp) != 1 || !exists(filepath.Join(res.BackedUp[0], "Panola.sc")) {
+	if exists(dup) || len(res.BackedUp) != 1 || !exists(filepath.Join(res.BackedUp[0], "Panola.sc"+disabledSuffix)) {
 		t.Errorf("copy not moved to a backup: %+v", res)
 	}
 	if res.InstalledTo != "" || len(s.State.Packages) != 0 {

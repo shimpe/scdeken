@@ -1,6 +1,7 @@
 package install
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -220,10 +221,14 @@ func (s *Service) forget(entry state.Entry) error {
 }
 
 // Quarantine moves the folder or file at path into the quarantine folder
-// for advisory advisoryID and returns where it went. Nothing is deleted.
+// for advisory advisoryID, disables its loadable files (see aside.go) and
+// returns where it went. Nothing is deleted.
 func (s *Service) Quarantine(path, advisoryID string) (string, error) {
 	if !advisory.ValidID(advisoryID) {
 		return "", fmt.Errorf("not a valid advisory id: %q", advisoryID)
+	}
+	if err := s.checkOutsideSearchPaths(s.Paths.Quarantine, "quarantine"); err != nil {
+		return "", err
 	}
 	base := filepath.Base(path)
 	dir := filepath.Join(s.Paths.Quarantine, advisoryID)
@@ -233,6 +238,11 @@ func (s *Service) Quarantine(path, advisoryID string) (string, error) {
 	dst := freePath(filepath.Join(dir, base))
 	if err := moveTree(path, dst); err != nil {
 		return "", moveError("move", base, err)
+	}
+	if err := disableTree(dst); err != nil {
+		// Still recorded as gone: the copy is out of the search paths.
+		err = fmt.Errorf("%s was moved to %s, but not all of its .sc, .scx and .so files could be renamed to end in %s: %w", base, dst, disabledSuffix, err)
+		return dst, errors.Join(err, s.forgetPath(path))
 	}
 	if err := s.forgetPath(path); err != nil {
 		return dst, fmt.Errorf("%s was moved to %s, but the install record could not be saved: %w", base, dst, err)

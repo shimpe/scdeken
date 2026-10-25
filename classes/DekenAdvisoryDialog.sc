@@ -127,7 +127,7 @@ DekenAdvisoryDialog {
 			DekenDialogs.prLabel("It is installed at:"),
 			TextField().string_(hit["item"]["path"]).maxHeight_(24),
 			DekenDialogs.prLabel(this.limitsText),
-			DekenDialogs.prLabel("Nothing is deleted: removing moves it to a quarantine folder.")
+			DekenDialogs.prLabel("Nothing is deleted: removing moves it to a quarantine folder, where it cannot load.")
 		]
 	}
 

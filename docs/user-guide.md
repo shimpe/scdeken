@@ -239,8 +239,8 @@ cause "duplicate class" errors. sc-deken looks for existing copies and asks:
 
 ![A copy already exists](screenshots/dialog-duplicates.png)
 
-- **Replace** moves the old copy to a backup folder (it is never deleted) and installs
-  the new one.
+- **Replace** moves the old copy to a backup folder (it is never deleted, and its files
+  are renamed so they can't load from there) and installs the new one.
 - **Keep existing** stops, and leaves your copy as it is.
 
 ## 10. Update and remove
@@ -292,8 +292,10 @@ hole, or a bug that can crash your computer or lose your work. The maintainers c
 You decide what happens. **Nothing is removed without your permission.**
 
 - **Remove now** (recommended for malware and serious vulnerabilities) moves the
-  package to a *quarantine* folder outside the places SuperCollider loads from.
-  Nothing is deleted, so a false alarm costs you nothing. Afterwards you are asked to
+  package to a *quarantine* folder outside the places SuperCollider loads from, and
+  renames its `.sc`, `.scx` and `.so` files to end in `.disabled`, so it can't load
+  even if a setting of yours points SuperCollider there. Nothing is deleted, so a false
+  alarm costs you nothing. Afterwards you are asked to
   recompile the class library (and reboot the server for plugins).
 
   ![After removing](screenshots/dialog-removed.png)
@@ -430,7 +432,21 @@ its sc-deken files in: the `sc-deken` folder inside `Platform.userAppSupportDir`
 where they are). Only do this for folders you recognise.
 
 **I want my old copy back after "Replace".** The old copy is in the `backup` folder inside
-`Platform.userAppSupportDir +/+ "sc-deken"`.
+`Platform.userAppSupportDir +/+ "sc-deken"`, in a subfolder named after the date and time.
+So that it can't load from there by accident, its `.sc`, `.scx` and `.so` files were
+renamed to end in `.disabled` (`FMX6.scx` became `FMX6.scx.disabled`). Remove the package
+installed by sc-deken first, then move the folder back where it was, take `.disabled` off
+those file names, recompile and reboot the server. The same goes for a package you take
+back out of quarantine.
+
+**"Nothing was moved: the backup (or quarantine) folder … is inside …"** sc-deken keeps
+replaced and withdrawn copies in `Platform.userAppSupportDir +/+ "sc-deken"`, a folder
+SuperCollider normally does not load from. On your computer one of the folders it does
+load from contains it: an include path in `LanguageConfig` (for example your home
+folder), or a changed `Platform.userExtensionDir` or `Platform.systemExtensionDir`. The
+message names which. A copy moved there would load again, so sc-deken refuses. Change
+that setting so it no longer contains the sc-deken folder (add the specific folders you
+need as include paths instead), recompile, and try again.
 
 **Where are my files?** Plugins installed by sc-deken are in
 `Platform.userExtensionDir/sc-deken/<package>`. Evaluate `Platform.userExtensionDir` to see
