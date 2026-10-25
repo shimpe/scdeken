@@ -307,11 +307,13 @@ The sclang unit tests are not part of CI (they need a SuperCollider installation
   `main` needs reviewed pull requests with no bypass for bots. (With a single maintainer,
   required Code Owner review blocks the owner's own pull requests; the recipes README
   explains the two ways out.)
-- A Publish build leg runs the package's own build with the run's artifact token, so it
-  could upload an artifact under another leg's name. The release job publishes only
-  artifacts named after a planned leg whose job succeeded and holding exactly that leg's
-  zip and file list. A leg could still ship a bad build of its own package and platform,
-  which is why the code at the pinned commit is reviewed.
+- A Publish build leg runs the package's own build code with the run's artifact token.
+  The release job only publishes artifacts named after a planned leg whose job succeeded
+  and holding exactly that leg's zip and file list, which stops a careless or simple
+  mix-up. It does not stop deliberate tampering: code running in one leg can delete and
+  re-upload another leg's artifact (including another package's) within the same run.
+  The real boundary is human review of the code at every approved commit, so approve
+  only packages whose code you have looked at.
 - Withdrawing is fast (a reviewed pull request to `advisories/`), and removal on users'
   computers always needs their permission and goes to quarantine.
 
