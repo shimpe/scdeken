@@ -10,7 +10,7 @@
 DekenGui {
 	classvar kinds;           // filter chips: label and the helper's kind
 	classvar <columnWidths;   // type, name, status; the summary gets the rest
-	var <window, <sidebar, stack, <details, <search, <kindButtons, <unreviewedBox, <tree, logView, statusLabel, activity;
+	var <window, <sidebar, stack, <details, <search, <kindButtons, <unreviewedBox, <suggestButton, <tree, logView, statusLabel, activity;
 	var <rows, items, generation = 0, searchToken = 0, kind, page = 0, selectedName, selectedRow;
 	var <installed, catalog, busy, log, jobPlans;
 
@@ -117,12 +117,15 @@ DekenGui {
 			Button().states_([[pair[0], Color.black, Color.grey(0.93)], [pair[0], Color.black, Color.new255(207, 220, 247)]])
 				.value_(if(i == 0) { 1 } { 0 }).maxHeight_(24).action_({ this.prPickKind(i) })
 		};
+		suggestButton = Button().states_([["Suggest a package"]]).maxHeight_(24)
+			.toolTip_("Ask the maintainers to add a plugin or quark (opens a form on GitHub)")
+			.action_({ DekenStyle.suggestURL(DekenStyle.githubAddressIn(search.string)).openOS });
 		tree = TreeView().columns_(["Type", "Name", "Summary", "Status"]).minWidth_(480);
 		tree.onItemChanged = { this.prSelect };
 		tree.setProperty(\indentation, 0);
 		^View().layout_(VLayout(
 			HLayout(search, unreviewedBox),
-			HLayout(*(kindButtons ++ [nil])),
+			HLayout(*(kindButtons ++ [nil, suggestButton])),
 			tree
 		).margins_(0).spacing_(6))
 	}

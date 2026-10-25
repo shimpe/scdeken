@@ -101,4 +101,14 @@ TestDekenStyle : UnitTest {
 		this.assertEquals(DekenStyle.advisoryURL("SCD-2026-001"),
 			"https://github.com/shimpe/scdeken-recipes/blob/main/advisories/SCD-2026-001.toml");
 	}
+
+	test_suggestNewPackage {
+		var form = "https://github.com/shimpe/scdeken-recipes/issues/new?template=add-package.yml";
+		this.assertEquals(DekenStyle.suggestURL(nil), form, "no address: the empty form");
+		this.assertEquals(DekenStyle.suggestURL(""), form, "empty address: the empty form");
+		this.assertEquals(DekenStyle.githubAddressIn("  https://github.com/a/b "), "https://github.com/a/b", "a pasted address");
+		this.assertEquals(DekenStyle.githubAddressIn("github.com/a/b"), "https://github.com/a/b", "without https://");
+		this.assertEquals(DekenStyle.githubAddressIn("granular reverb"), nil, "search words are not an address");
+		this.assertEquals(DekenStyle.githubAddressIn("https://github.com/a/b c"), nil, "not one address");
+	}
 }

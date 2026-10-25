@@ -90,9 +90,21 @@ DekenStyle {
 		^"https://github.com/shimpe/scdeken-recipes/blob/main/advisories/%.toml".format(id)
 	}
 
-	// The form for asking for a package to be reviewed.
+	// The form for asking for a package to be added or reviewed, with the
+	// repository address filled in when there is one.
 	*suggestURL { |repo|
-		^"https://github.com/shimpe/scdeken-recipes/issues/new?template=add-package.yml&repo_url=%".format(this.percentEncode(repo))
+		var form = "https://github.com/shimpe/scdeken-recipes/issues/new?template=add-package.yml";
+		if(repo.isNil or: { repo.isEmpty }) { ^form };
+		^form ++ "&repo_url=" ++ this.percentEncode(repo)
+	}
+
+	// The GitHub address in a search text such as "github.com/owner/name", or
+	// nil when the text is not one address.
+	*githubAddressIn { |text|
+		var t = text.asString.stripWhiteSpace;
+		if(t.beginsWith("github.com/")) { t = "https://" ++ t };
+		if(t.beginsWith("https://github.com/").not or: { t.includes($ ) }) { ^nil };
+		^t
 	}
 
 	// A new issue on the recipes repository about a local build that failed:
