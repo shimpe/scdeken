@@ -42,10 +42,12 @@ DekenRows {
 		^DekenStyle.badgeText(row[\trust], route, row[\retracted], row[\update])
 	}
 
-	// The summary, with the code match (if any) at the end.
+	// The summary, with the code match (if any) in front: a long summary is cut
+	// off at the column's right edge, and the match must stay visible.
 	*summaryCell { |row|
 		var note = DekenStyle.matchedText(row[\match]);
 		var summary = row[\summary] ? "";
-		^if(note.isEmpty) { summary } { summary ++ " — " ++ note }
+		if(note.isEmpty) { ^summary };
+		^if(summary.isEmpty) { note } { note ++ " — " ++ summary }
 	}
 }

@@ -94,7 +94,8 @@ sound you have heard of ("fm", "reverb") or for a UGen name from someone's code.
 ![Searching for fm](screenshots/02-search.png)
 
 Here `fm` finds fmx6 and nome6 by name and summary, and sc3-plugins because it
-contains the UGen `FM7` (the note after the summary says so).
+contains the UGen `FM7` (the note in front of its summary says so, so a long summary
+never hides it).
 
 Use the filter buttons to show only plugins, only quarks, or only packages that are
 both. By default the list shows reviewed and community-listed packages. To include

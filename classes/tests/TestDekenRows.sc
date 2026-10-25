@@ -37,9 +37,11 @@ TestDekenRows : UnitTest {
 		this.assertEquals(DekenRows.fromHit(hit, nil)[\update], false);
 	}
 
-	test_summaryCellEndsWithTheMatch {
+	// The match comes first, so a long summary cut off by the column never hides it.
+	test_summaryCellStartsWithTheMatch {
 		var hit = (summary: "Community plugins", match: Dictionary.newFrom(["field", "ugen", "value", "FM7"]));
-		this.assertEquals(DekenRows.summaryCell(hit), "Community plugins — matched UGen: FM7");
+		this.assertEquals(DekenRows.summaryCell(hit), "matched UGen: FM7 — Community plugins");
+		this.assertEquals(DekenRows.summaryCell((summary: "", match: hit[\match])), "matched UGen: FM7", "no summary, no dash");
 		this.assertEquals(DekenRows.summaryCell((summary: "Plain", match: Dictionary.newFrom(["field", "name", "value", "x"]))), "Plain");
 		this.assertEquals(DekenRows.summaryCell((summary: nil)), "");
 	}
