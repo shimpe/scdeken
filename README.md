@@ -60,6 +60,9 @@ commit that would be built.
 
 ![Confirmation for an unreviewed package](docs/screenshots/dialog-confirm.png)
 
+**Missing a package? Suggest it from the window.** **Suggest a package** opens a short
+GitHub form; the maintainers get a draft recipe built on every platform to review.
+
 **Installed packages, updates and the build log.**
 
 ![The Installed page, with an update waiting for portedplugins](docs/screenshots/07-installed.png)

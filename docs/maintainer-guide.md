@@ -99,7 +99,10 @@ tag_prefix = ""             # "v" if upstream tags look like v1.2.3
 ### The easy way: the issue form
 
 Anyone can open an issue with the **Add a package** form on the recipes repository
-and paste the GitHub address. A workflow runs `scdeken recipe new <url>`, which looks
+and paste the GitHub address. Users reach it from the **Suggest a package** button in
+the SuperCollider window (and from **Suggest for review** on an unreviewed package).
+The form tags the issue with the label `add-package`; that label must exist in the
+recipes repository, or GitHub drops it and the workflow below never runs. A workflow runs `scdeken recipe new <url>`, which looks
 at the repository (license, description, tags or the latest commit, CMake layout, the
 `SC_PATH`-style variable, submodules, a `.quark` file) and opens a pull request with a
 draft recipe. The PR build compiles it on every platform and comments with the results.

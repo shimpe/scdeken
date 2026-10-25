@@ -101,6 +101,22 @@ both. By default the list shows reviewed and community-listed packages. To inclu
 automatically discovered, not yet reviewed packages tick **Show unreviewed**
 (see [section 8](#8-unreviewed-packages)).
 
+### Missing a package?
+
+Click **Suggest a package** at the right end of the filter buttons. It opens the
+"Add a package" form on GitHub, where you paste the address of the plugin or quark
+(for example `https://github.com/someone/their-plugin`). If you pasted that address
+into the search box first, the form already has it. You need a GitHub account to send
+the form. You can also open the form directly:
+<https://github.com/shimpe/scdeken-recipes/issues/new?template=add-package.yml>.
+
+The maintainers get a pull request with a draft recipe and a build on every platform;
+once they have reviewed and merged it, the package shows up for everyone the next day.
+
+If you wrote the package yourself, you can also add the GitHub topic
+`supercollider-plugin` or `supercollider-quark` to your repository. sc-deken then finds
+it on its own (the next day) and lists it as unreviewed.
+
 ## 5. What the labels mean
 
 **Type** (the coloured box at the start of a row, repeated at the top of the
