@@ -33,10 +33,13 @@ DekenRows {
 		}
 	}
 
-	// The badge text of a row; busy rows say "working…".
+	// The badge text of a row; busy rows say "working…". Before the row is
+	// planned its route is unknown, but a quark is never built, so its kind
+	// stands in for the route.
 	*status { |row, isBusy|
+		var route = row[\route] ?? { if(row[\kind] == "quark") { "quark" } };
 		if(isBusy) { ^"working…" };
-		^DekenStyle.badgeText(row[\trust], row[\route], row[\retracted], row[\update])
+		^DekenStyle.badgeText(row[\trust], route, row[\retracted], row[\update])
 	}
 
 	// The summary, with the code match (if any) at the end.

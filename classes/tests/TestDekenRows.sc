@@ -13,6 +13,14 @@ TestDekenRows : UnitTest {
 		this.assertEquals(DekenRows.status((trust: "reviewed", route: "prebuilt"), true), "working…");
 	}
 
+	// Before a row is planned its route is unknown; a quark is still never built.
+	test_unplannedUnreviewedQuarkIsNotBuilt {
+		this.assertEquals(DekenRows.status((trust: "unreviewed", kind: "quark"), false), "⚠ unreviewed");
+		this.assertEquals(DekenRows.status((trust: "unreviewed", kind: "quark", route: "quark"), false), "⚠ unreviewed", "same once planned");
+		this.assertEquals(DekenRows.status((trust: "unreviewed", kind: "plugin"), false), "⚠ unreviewed · build locally");
+		this.assertEquals(DekenRows.status((trust: "unreviewed", kind: "plugin+quark"), false), "⚠ unreviewed · build locally");
+	}
+
 	test_installedFillsFromTheList {
 		var known = Dictionary.newFrom(["summary", "Patterns", "kind", "quark", "trust", "reviewed"]);
 		var row = DekenRows.fromInstalled(Dictionary.newFrom(["name", "Panola", "version", "1.0", "update_available", true]), known);
