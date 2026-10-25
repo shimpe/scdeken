@@ -175,6 +175,8 @@ func TestScanLicense(t *testing.T) {
 		"Apache License\n Version 2.0, January 2004":                                "Apache-2.0",
 		"Redistribution and use in source and binary forms ... Neither the name of": "BSD-3-Clause",
 		"Redistribution and use in source and binary forms, with two clauses":       "",
+
+		// A copyright line is not a license.
 		"all rights reserved": "",
 	}
 	for text, want := range cases {
