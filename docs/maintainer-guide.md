@@ -235,11 +235,61 @@ a lone quote at the end of a value, and refuses the joined form with this explan
    as its secret `SCDEKEN_SIGNING_KEY` and the password as `SCDEKEN_SIGNING_PASSWORD`
    (keygen asks for the password twice). Only the Index workflow's sign job and the
    Publish workflow's release step use that environment; pull request builds never see it.
+   The clicks are listed in [Storing the key in GitHub, step by step](#storing-the-key-in-github-step-by-step).
 2. Paste the **public** key (the line starting with `RW`) into `EmbeddedPublicKey` in
    `internal/sign/key.go` of the tool repository, commit, and make a release (section 8).
    The release workflow refuses to run while that constant is empty.
 3. Back the secret key up. Without it you cannot sign; with a stolen copy and password
    someone could publish a forged list to users who already trust the key.
+
+### Storing the key in GitHub, step by step
+
+Everything below happens in the **recipes** repository on github.com. Keep the order:
+restrict the environment to `main` first, add the secrets after. A secret added before
+the restriction is open to every branch for that moment.
+
+**Create the `release` environment**
+
+1. Open the recipes repository and click **Settings** (you need admin rights).
+2. In the left sidebar, under *Code and automation*, click **Environments**.
+3. Click **New environment**, name it exactly `release` (lowercase; the workflows look
+   for this name) and click **Configure environment**.
+
+**Restrict it to `main`**
+
+1. Under **Deployment branches and tags**, change the dropdown from *No restriction* to
+   **Selected branches and tags**.
+2. Click **Add deployment branch or tag rule**, set *Ref type* to **Branch** and
+   *Name pattern* to `main`, and click **Add rule**.
+3. Leave **Required reviewers** and **Wait timer** off: the nightly Index job uses this
+   environment, so a required reviewer would mean approving it by hand every night.
+
+**Add the two secrets**
+
+Use **Environment secrets** on the same page, not the repository-wide
+*Secrets and variables → Actions*.
+
+1. Click **Add environment secret**. Name: `SCDEKEN_SIGNING_KEY`. Value: the **whole**
+   text of `scdeken.key`, including the first line starting with `untrusted comment:`.
+   Click **Add secret**. To copy the file in PowerShell:
+
+   ```powershell
+   Get-Content 'C:\path\to\scdeken.key' -Raw | Set-Clipboard
+   ```
+
+   or on macOS `pbcopy < /path/to/scdeken.key`, on Linux
+   `xclip -selection clipboard < /path/to/scdeken.key`.
+2. Click **Add environment secret** again. Name: `SCDEKEN_SIGNING_PASSWORD`. Value: the
+   password you gave keygen, without a trailing space or newline. Click **Add secret**.
+3. Clear the clipboard afterwards, for example `Set-Clipboard -Value ' '` in PowerShell.
+
+**Check that it works**
+
+1. Turn on Pages first (**Settings → Pages → Source: GitHub Actions**); without it the
+   deploy step fails even when signing works.
+2. Open **Actions → Index → Run workflow**, keep the branch on `main`, and run it.
+3. The sign job should go green. If it fails with a key or password error, add the
+   secret again: GitHub lets you overwrite a secret but never shows it.
 
 Users' computers also accept extra public keys from a `trusted-keys.txt` file in the
 `sc-deken` folder; this is for tests and private mirrors. The index can also announce a
