@@ -2,3 +2,19 @@
 /scdeken
 /scdeken.exe
 .superpowers/
+
+# Go defaults (from the GitHub template)
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.*
+!coverage.go
+*.coverprofile
+profile.cov
+go.work
+go.work.sum
+.env
