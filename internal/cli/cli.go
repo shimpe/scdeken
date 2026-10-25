@@ -34,7 +34,7 @@ commands:
   recipe approve <file> <version> <commit>
   index build|sign|keygen|new-versions   (maintainers)
   advisories validate --dir <folder>
-  ci matrix|platforms|pack   (CI)
+  ci matrix|platforms|targets|pack   (CI)
   build --recipe <file> --version <v> --out <folder>   (CI)
   run <request.json> <result.json>`
 

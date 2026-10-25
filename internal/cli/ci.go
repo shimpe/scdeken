@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/shimpe/scdeken/internal/archive"
@@ -14,6 +15,7 @@ import (
 	"github.com/shimpe/scdeken/internal/indexer"
 	"github.com/shimpe/scdeken/internal/platform"
 	"github.com/shimpe/scdeken/internal/recipe"
+	"github.com/shimpe/scdeken/internal/version"
 )
 
 // The commands the recipes repository's CI workflows call.
@@ -27,6 +29,13 @@ func init() {
 		run: runCIMatrix,
 	}
 	commands["ci-platforms"] = command{usage: "ci platforms", run: runCIPlatforms}
+	commands["ci-targets"] = command{
+		usage: "ci targets --sc-versions <file>",
+		flags: func(fs *flag.FlagSet, req *Request) {
+			fs.StringVar(&req.Maint.SCVersions, "sc-versions", "", "sc-versions.toml")
+		},
+		run: runCITargets,
+	}
 	commands["ci-pack"] = command{
 		usage: "ci pack <folder> <zip-file>",
 		args: func(pos []string, req *Request) error {
@@ -87,13 +96,79 @@ type ciPlatform struct {
 	BuildArch string `json:"build_arch"` // value for "scdeken build --arch"; "" = native
 }
 
+var ciPlatforms = []ciPlatform{
+	{"linux", "x86_64", "ubuntu-22.04", ""},
+	{"linux", "arm64", "ubuntu-22.04-arm", ""},
+	{"macos", "universal", "macos-latest", "universal"},
+	{"windows", "x86_64", "windows-latest", ""},
+}
+
 func runCIPlatforms(context.Context, Request, *session) (any, error) {
-	return jsonText{[]ciPlatform{
-		{"linux", "x86_64", "ubuntu-22.04", ""},
-		{"linux", "arm64", "ubuntu-22.04-arm", ""},
-		{"macos", "universal", "macos-latest", "universal"},
-		{"windows", "x86_64", "windows-latest", ""},
-	}}, nil
+	return jsonText{ciPlatforms}, nil
+}
+
+// ciTarget is one build the publish workflow makes for each package
+// version: a machine type and a plugin API, with the SuperCollider release
+// whose headers it is built against and the platform key it is published as.
+type ciTarget struct {
+	ciPlatform
+	SCVersion string `json:"sc_version"`
+	API       int    `json:"api"`
+	Key       string `json:"key"`
+}
+
+// runCITargets builds every plugin API in sc-versions.toml once per machine
+// type, against the newest release listed with that API.
+func runCITargets(_ context.Context, req Request, _ *session) (any, error) {
+	if req.Maint.SCVersions == "" {
+		return nil, usageError{"ci targets needs --sc-versions"}
+	}
+	rows, err := loadSCVersions(req.Maint.SCVersions)
+	if err != nil {
+		return nil, err
+	}
+	newest, err := newestPerAPI(rows)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", req.Maint.SCVersions, err)
+	}
+	var targets []ciTarget
+	for _, p := range ciPlatforms {
+		for _, row := range newest {
+			key := platform.Key{OS: p.KeyOS, Arch: p.Arch, API: row.API}
+			targets = append(targets, ciTarget{ciPlatform: p, SCVersion: row.Version, API: row.API, Key: key.String()})
+		}
+	}
+	return jsonText{targets}, nil
+}
+
+// newestPerAPI returns, for each plugin API in rows (lowest first), the row
+// with the newest SuperCollider release.
+func newestPerAPI(rows []platform.SCVersion) ([]platform.SCVersion, error) {
+	if len(rows) == 0 {
+		return nil, fmt.Errorf("no [[sc]] rows")
+	}
+	best := map[int]platform.SCVersion{}
+	for _, row := range rows {
+		if row.API < 1 {
+			return nil, fmt.Errorf("SuperCollider %q has no plugin api", row.Version)
+		}
+		v, err := version.Parse(row.Version)
+		if err != nil {
+			return nil, fmt.Errorf("SuperCollider version %q: %w", row.Version, err)
+		}
+		if prev, ok := best[row.API]; ok {
+			if pv, _ := version.Parse(prev.Version); pv.Compare(v) >= 0 {
+				continue
+			}
+		}
+		best[row.API] = row
+	}
+	var out []platform.SCVersion
+	for _, row := range best {
+		out = append(out, row)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].API < out[j].API })
+	return out, nil
 }
 
 func runCIPack(_ context.Context, req Request, _ *session) (any, error) {

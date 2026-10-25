@@ -355,6 +355,65 @@ The sclang unit tests are not part of CI (they need a SuperCollider installation
 | `publish.yml` | merge to `main`, or by hand (recipe, version) | builds the approved versions; a failed platform is left out and the others are released as `<package>-<version>`; refreshes the index. Only artifacts of planned legs whose job succeeded, holding exactly their zip and file list, are published. |
 | `index.yml` | nightly, on merge, manual | builds the index, signs it in a separate job (the only job with the key), deploys to GitHub Pages; the tag bot opens version PRs and moved-tag issues. |
 
+### SuperCollider versions and the plugin API
+
+A prebuilt download is published per **platform key** `<os>-<arch>-api<N>`, for
+example `windows-x86_64-api3`. `N` is the SuperCollider *plugin API*: the
+`sc_api_version` in `include/plugin_interface/SC_InterfaceTable.h` of the SuperCollider
+sources. A plugin loads in every release with the same API (3.13 and 3.14 both have 3),
+not in others.
+
+Which release has which API is written down in one place, `sc-versions.toml` in the
+recipes repository:
+
+```toml
+[[sc]]
+version = "3.14.1"   # the release CI builds against
+api = 3              # its plugin API
+min = "3.13.0"       # the oldest release that loads plugins built for it
+```
+
+- **On the user's computer** the index carries this table (`sc_versions`). sc-deken
+  takes the user's `Main.version` and picks the row with the highest `min` that is not
+  above it. If the user's major.minor is newer than that row's `version` (or no row
+  fits), the API counts as unknown: the window says "plugin API unknown for … —
+  packages will be built on this computer" and every plugin is built locally, because
+  a newer release might have a new API. Development versions count by their number:
+  `3.15.0-dev` is 3.15.
+- **In CI** `scdeken ci targets --sc-versions sc-versions.toml` lists the builds of
+  `pr-build.yml` and `publish.yml`: every machine type once per API, built against the
+  newest `version` listed with that API (`scdeken build --sc-version …` checks out that
+  release's headers).
+
+The index workflow copies the table into the index, so changing it needs no new
+sc-deken release: users see the change at their next package list refresh.
+
+**When a new SuperCollider release comes out:**
+
+1. Check its plugin API in the sources of the new tag:
+   `grep sc_api_version include/plugin_interface/SC_InterfaceTable.h`.
+2. **Same API** (for example 3.15.0 still at 3): set `version` of that API's row to the
+   new release and leave `min` alone. Builds from now on use its headers. The downloads
+   already published keep working, and users of the new release get them as soon as
+   the index has been rebuilt.
+3. **New API** (for example 4): add a row instead, with `min` set to the first release
+   that has it:
+   ```toml
+   [[sc]]
+   version = "3.16.0"
+   api = 4
+   min = "3.16.0"
+   ```
+   New approved versions are then built for both APIs. Versions released before the
+   change only have `-api3` downloads; to give a version `-api4` downloads too, run
+   `publish.yml` by hand for it (**Actions → Publish → Run workflow**, recipe and
+   version). Until then, users of the new release build that version locally.
+4. Merge to `main`. The index workflow runs on the merge (and nightly).
+
+`defaultSCVersion` in `internal/cli/maintainer.go` is only the default when you run
+`scdeken build` or `recipe check --build` by hand; CI always passes `--sc-version`.
+Raise it when convenient.
+
 ### Letting workflows open pull requests
 
 Three workflows open pull requests: `release.yml` in the tool repository (the

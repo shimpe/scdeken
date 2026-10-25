@@ -38,6 +38,65 @@ func TestCIPlatforms(t *testing.T) {
 	}
 }
 
+func TestCITargets(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "sc-versions.toml")
+	os.WriteFile(file, []byte(`
+[[sc]]
+version = "3.13.1"
+api = 3
+min = "3.13.0"
+
+[[sc]]
+version = "3.14.1"
+api = 3
+min = "3.13.0"
+
+[[sc]]
+version = "3.15.0"
+api = 4
+min = "3.15.0"
+`), 0o644)
+	code, out, errOut := runMain(t, Deps{}, "ci", "targets", "--sc-versions", file)
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut)
+	}
+	var rows []struct {
+		KeyOS, Arch, Runner, BuildArch, SCVersion, Key string
+		API                                            int
+	}
+	if err := json.Unmarshal([]byte(strings.NewReplacer("key_os", "KeyOS", "build_arch", "BuildArch", "sc_version", "SCVersion").Replace(out)), &rows); err != nil || len(rows) != 8 {
+		t.Fatalf("rows = %v (%v) from %s", rows, err, out)
+	}
+	// Each API is built once per machine, against its newest release.
+	if r := rows[0]; r.Key != "linux-x86_64-api3" || r.SCVersion != "3.14.1" || r.API != 3 || r.Runner != "ubuntu-22.04" {
+		t.Errorf("rows[0] = %+v", r)
+	}
+	if r := rows[1]; r.Key != "linux-x86_64-api4" || r.SCVersion != "3.15.0" || r.API != 4 {
+		t.Errorf("rows[1] = %+v", r)
+	}
+	if r := rows[5]; r.Key != "macos-universal-api4" || r.BuildArch != "universal" {
+		t.Errorf("rows[5] = %+v", r)
+	}
+}
+
+func TestCITargetsRefusesBadTables(t *testing.T) {
+	dir := t.TempDir()
+	for name, text := range map[string]string{
+		"empty":       "",
+		"no api":      "[[sc]]\nversion = \"3.14.1\"\nmin = \"3.13.0\"\n",
+		"bad version": "[[sc]]\nversion = \"three\"\napi = 3\nmin = \"3.13.0\"\n",
+	} {
+		file := filepath.Join(dir, strings.ReplaceAll(name, " ", "-")+".toml")
+		os.WriteFile(file, []byte(text), 0o644)
+		if code, out, _ := runMain(t, Deps{}, "ci", "targets", "--sc-versions", file); code == 0 {
+			t.Errorf("%s: exit 0, output %s", name, out)
+		}
+	}
+	if code, _, _ := runMain(t, Deps{}, "ci", "targets"); code != 2 {
+		t.Errorf("without --sc-versions: exit %d, want 2 (usage)", code)
+	}
+}
+
 func TestCIPack(t *testing.T) {
 	dir := t.TempDir()
 	src := filepath.Join(dir, "pkg")

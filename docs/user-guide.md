@@ -395,6 +395,15 @@ package, your platform, your SuperCollider version and the last lines of the log
 before you send it). You can also copy the log when you ask the package's author for help,
 and mention your platform line from the bottom of the window.
 
+**"plugin API unknown for 3.15.0 — packages will be built on this computer"** (at the
+bottom of the window). A compiled plugin only loads in SuperCollider releases with the
+same *plugin API* (the interface between scsynth and its plugins; 3.13 and 3.14 both
+use API 3). sc-deken learns which release has which API from the package list. Your
+SuperCollider is newer than any release the list knows about, so it can't be sure that
+the prebuilt downloads would load, and builds every plugin on your computer instead
+(see section 7). Quarks are not affected. Once the maintainers add your release, the
+prebuilt downloads come back by themselves the next time the package list is refreshed.
+
 **"…from before the first sc-deken release, so there is no helper to download yet"** or
 **"sc-deken x.y.z has no helper for this computer"**. The quark downloads its helper
 program (`scdeken`) from a GitHub release and checks it against the checksum listed in the
