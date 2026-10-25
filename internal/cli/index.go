@@ -178,14 +178,16 @@ func keyPassword(env string, s *session) (string, error) {
 	return password, nil
 }
 
-// askPassword writes prompt to out and reads one non-empty line from in.
+// askPassword writes prompt to out and reads one non-empty line from in. A
+// leading byte order mark is dropped: Windows PowerShell can start piped text
+// with one.
 func askPassword(in *bufio.Reader, out io.Writer, prompt string) (string, error) {
 	fmt.Fprint(out, prompt)
 	line, err := in.ReadString('\n')
 	if err != nil && line == "" {
 		return "", errors.New("no password was given")
 	}
-	password := strings.TrimRight(line, "\r\n")
+	password := strings.TrimPrefix(strings.TrimRight(line, "\r\n"), byteOrderMark)
 	if password == "" {
 		return "", errors.New("the password must not be empty")
 	}
@@ -243,3 +245,6 @@ func runAdvisoriesValidate(_ context.Context, req Request, _ *session) (any, err
 	}
 	return map[string]int{"valid": len(advs)}, nil
 }
+
+// byteOrderMark is U+FEFF encoded as UTF-8.
+const byteOrderMark = "\xef\xbb\xbf"

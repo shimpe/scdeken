@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -120,6 +121,9 @@ func parseCommand(cmd command, args []string, req *Request) error {
 	if err != nil {
 		return usageError{err.Error()}
 	}
+	if err := fixStrayQuotes(fs, pos); err != nil {
+		return err
+	}
 	if cmd.args == nil {
 		cmd.args = noArgs
 	}
@@ -140,6 +144,48 @@ func parseInterspersed(fs *flag.FlagSet, args []string) ([]string, error) {
 		words = append(words, fs.Arg(0))
 		args = fs.Args()[1:]
 	}
+}
+
+// windowsArgs is true when arguments went through Windows command-line
+// parsing; tests set it to check the quote repair on any system.
+var windowsArgs = runtime.GOOS == "windows"
+
+// fixStrayQuotes repairs what Windows command-line parsing does to a quoted
+// folder that ends in a backslash: 'C:\my keys\' arrives as C:\my keys" because
+// the backslash turns the closing quote into text. No Windows name contains a
+// quote, so a quote at the very end is dropped. A quote anywhere else means the
+// rest of the line was joined into the same argument; that is refused with a
+// hint.
+func fixStrayQuotes(fs *flag.FlagSet, words []string) error {
+	if !windowsArgs {
+		return nil
+	}
+	var bad string
+	fix := func(v, shown string) string {
+		i := strings.Index(v, `"`)
+		if i >= 0 && i == len(v)-1 {
+			return v[:i]
+		}
+		if i >= 0 && bad == "" {
+			bad = shown
+		}
+		return v
+	}
+	fs.Visit(func(f *flag.Flag) {
+		v := f.Value.String()
+		if fixed := fix(v, "--"+f.Name+" "+v); fixed != v {
+			f.Value.Set(fixed)
+		}
+	})
+	for i, w := range words {
+		words[i] = fix(w, w)
+	}
+	if bad == "" {
+		return nil
+	}
+	return usageError{fmt.Sprintf("%s contains a quote character. On Windows a trailing backslash "+
+		`before a closing quote ("C:\my keys\") makes the quote part of the text and joins the rest `+
+		`of the line into this argument; leave the trailing backslash out ("C:\my keys")`, bad)}
 }
 
 func noArgs(pos []string, _ *Request) error {

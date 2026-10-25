@@ -120,6 +120,68 @@ func TestKeygenPromptsOnStdin(t *testing.T) {
 	}
 }
 
+// TestKeygenIgnoresByteOrderMark covers Windows PowerShell, which starts piped
+// text with a UTF-8 byte order mark when $OutputEncoding is UTF-8.
+func TestKeygenIgnoresByteOrderMark(t *testing.T) {
+	dir := t.TempDir()
+	code, _, errOut := runMain(t, Deps{Stdin: strings.NewReader("\uFEFFsecret\r\nsecret\r\n")}, "index", "keygen", "--out-dir", dir)
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut)
+	}
+	key, _ := os.ReadFile(filepath.Join(dir, "scdeken.key"))
+	if _, err := sign.Sign(key, "secret", []byte("m")); err != nil {
+		t.Errorf("key does not open with the typed password: %v", err)
+	}
+}
+
+// TestKeygenOutDirWithSpaces is the plain case: a folder name with spaces,
+// passed as one argument.
+func TestKeygenOutDirWithSpaces(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "my signing keys")
+	t.Setenv("TEST_KEY_PASSWORD", "hunter2")
+	if code, _, errOut := runMain(t, Deps{}, "index", "keygen", "--out-dir", dir, "--password-env", "TEST_KEY_PASSWORD"); code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "scdeken.key")); err != nil {
+		t.Error(err)
+	}
+}
+
+// TestKeygenRepairsTrailingQuote covers `--out-dir 'C:\my keys\'` typed in
+// Windows PowerShell: the program receives C:\my keys" and the quote is dropped.
+func TestKeygenRepairsTrailingQuote(t *testing.T) {
+	defer func(old bool) { windowsArgs = old }(windowsArgs)
+	windowsArgs = true
+	dir := filepath.Join(t.TempDir(), "my keys")
+	code, _, errOut := runMain(t, Deps{Stdin: strings.NewReader("secret\nsecret\n")}, "index", "keygen", "--out-dir", dir+`"`)
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "scdeken.key")); err != nil {
+		t.Error(err)
+	}
+}
+
+// TestKeygenExplainsStrayQuote covers `--out-dir "C:\my keys\" --password-env X`
+// on Windows: the backslash before the closing quote makes the quote text, so
+// the program receives the rest of the line as one value.
+func TestKeygenExplainsStrayQuote(t *testing.T) {
+	defer func(old bool) { windowsArgs = old }(windowsArgs)
+	windowsArgs = true
+	dir := t.TempDir()
+	merged := filepath.Join(dir, "my keys") + `" --password-env TEST_KEY_PASSWORD`
+	code, _, errOut := runMain(t, Deps{Stdin: strings.NewReader("")}, "index", "keygen", "--out-dir", merged)
+	if code != 2 || !strings.Contains(errOut, "trailing backslash") {
+		t.Fatalf("exit %d: %s", code, errOut)
+	}
+	if strings.Contains(errOut, "Password") {
+		t.Errorf("asked for a password before rejecting the folder: %s", errOut)
+	}
+	if entries, _ := os.ReadDir(dir); len(entries) != 0 {
+		t.Errorf("files written: %v", entries)
+	}
+}
+
 func TestKeygenRefusesMismatchedPasswords(t *testing.T) {
 	dir := t.TempDir()
 	code, _, errOut := runMain(t, Deps{Stdin: strings.NewReader("secret\nsecert\n")}, "index", "keygen", "--out-dir", dir)
