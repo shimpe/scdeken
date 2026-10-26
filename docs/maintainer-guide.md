@@ -514,6 +514,14 @@ from real-time scanning may help.
 **The index workflow cannot sign.** The `release` environment must exist, be limited to
 `main`, and have both secrets. Pull requests never get them, by design.
 
+**Users get `download https://shimpe.github.io/scdeken-recipes/index.json: server
+answered 404 Not Found`.** The Pages source of the recipes repository is *Deploy from a
+branch*. Then every push to `main` starts GitHub's own "pages build and deployment"
+run, which publishes the README as the site and replaces the index that `index.yml`
+deployed. Set **Settings → Pages → Source: GitHub Actions**, then run **Actions → Index →
+Run workflow** to put the index back. Check that both
+`https://shimpe.github.io/scdeken-recipes/index.json` and `index.json.minisig` load.
+
 **`GitHub Actions is not permitted to create or approve pull requests`.** The release,
 add-package or tag-bot job could not open its pull request. Tick the setting described in
 [Letting workflows open pull requests](#letting-workflows-open-pull-requests) in that
