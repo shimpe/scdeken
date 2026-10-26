@@ -56,4 +56,13 @@ TestDekenRows : UnitTest {
 		this.assertEquals(DekenRows.installedRows(installed, catalog, false, "plugin", "").collect { |r| r[\name] }, ["A"]);
 		this.assertEquals(DekenRows.installedRows(installed, catalog, false, nil, "fm").collect { |r| r[\name] }, ["A"]);
 	}
+
+	test_findRepo {
+		var catalog = Dictionary.new;
+		catalog["panola"] = Dictionary.newFrom(["name", "Panola", "repo", "https://github.com/shimpe/panola"]);
+		catalog["fmx6"] = Dictionary.newFrom(["name", "fmx6", "repo", "https://github.com/a/fmx6"]);
+		this.assertEquals(DekenRows.findRepo(catalog, "https://github.com/Shimpe/Panola.git/") !? { |h| h["name"] }, "Panola", "another spelling");
+		this.assertEquals(DekenRows.findRepo(catalog, "https://github.com/shimpe/panola-other"), nil, "another repository");
+		this.assertEquals(DekenRows.findRepo(catalog, nil), nil, "no address");
+	}
 }

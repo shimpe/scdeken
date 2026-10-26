@@ -43,14 +43,14 @@ list::
 Nothing in the window makes SuperCollider wait. While a package is being installed its row says "working..." and its buttons are off.
 
 SECTION:: Find a package
-Type in the search box. Deken looks at the package name, the summary and the names of the UGens and classes inside the package, so you can search for a sound ("fm", "reverb") or for a UGen name you saw in someone's code.
+Type in the search box. Deken looks at the package name, the summary and the names of the UGens and classes inside the package, so you can search for a sound ("fm", "reverb") or for a UGen name you saw in someone's code. You can also paste a GitHub address (https://github.com/owner/name): the list then shows the package of that repository, if there is one.
 
 image::images/02-search.png#Searching for fm: fmx6 and nome6 match by name and summary, sc3-plugins because it contains the UGen FM7::
 
 Use the filter buttons to show only plugins, only quarks, or only packages that are both. Tick Show unreviewed to include packages that were found automatically and that nobody has looked at yet.
 
 SUBSECTION:: Missing a package?
-Click Suggest a package at the right end of the filter buttons. It opens the "Add a package" form on GitHub (you need a GitHub account), where you paste the address of the plugin or quark. If you pasted that address into the search box first, the form already has it. The maintainers get a draft recipe with a build on every platform; once they have reviewed it, the package shows up for everyone the next day. The form is also at link::https://github.com/shimpe/scdeken-recipes/issues/new?template=add-package.yml::.
+Click Suggest a package at the right end of the filter buttons. It opens the "Add a package" form on GitHub (you need a GitHub account), where you paste the address of the plugin or quark. If you pasted that address into the search box first, the form already has it. If that address is already in the package list, the button shows that package instead of opening the form (an unreviewed one has a Suggest for review button). The maintainers get a draft recipe with a build on every platform; once they have reviewed it, the package shows up for everyone the next day. The form is also at link::https://github.com/shimpe/scdeken-recipes/issues/new?template=add-package.yml::.
 
 If you wrote the package yourself, add the GitHub topic code::supercollider-plugin:: or code::supercollider-quark:: to your repository: sc-deken then finds it on its own and lists it as unreviewed.
 

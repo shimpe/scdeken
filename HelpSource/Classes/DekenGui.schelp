@@ -4,7 +4,7 @@ categories:: Quarks
 related:: Guides/Deken-Guide, Classes/Deken
 
 DESCRIPTION::
-The window opened by code::Deken.gui::. On the left: Browse, Installed, Updates, Build log and Settings. The list shows, for every package, its type (PLUGIN, QUARK or PLUGIN + QUARK), name, a one-line summary, a status badge and, for hits found in code, a note such as "matched UGen: FM7". Select a package to see what it contains, which version you get and how it will be installed. Suggest a package, at the end of the filter buttons, opens the GitHub form for asking the maintainers to add a plugin or quark (with the address filled in when the search box holds one).
+The window opened by code::Deken.gui::. On the left: Browse, Installed, Updates, Build log and Settings. The list shows, for every package, its type (PLUGIN, QUARK or PLUGIN + QUARK), name, a one-line summary, a status badge and, for hits found in code, a note such as "matched UGen: FM7". Select a package to see what it contains, which version you get and how it will be installed. Suggest a package, at the end of the filter buttons, opens the GitHub form for asking the maintainers to add a plugin or quark (with the address filled in when the search box holds one). When that address is already in the package list, it shows that package instead.
 
 Nothing in the window waits for the helper: a package that is being installed shows "working…" and its buttons are off until it is done. The Build log page shows what the helper reports, with a header for each job.
 

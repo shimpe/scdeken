@@ -86,6 +86,8 @@ its row says "working…" and its buttons are off; you can keep browsing.
 Type in the search box. sc-deken looks at the package name, the summary and the
 names of the UGens and classes inside the package, so you can search for a
 sound you have heard of ("fm", "reverb") or for a UGen name from someone's code.
+You can also paste a GitHub address (`https://github.com/owner/name`): the list then
+shows the package of that repository, if there is one.
 
 ![Searching for fm](screenshots/02-search.png)
 
@@ -103,8 +105,9 @@ automatically discovered, not yet reviewed packages tick **Show unreviewed**
 Click **Suggest a package** at the right end of the filter buttons. It opens the
 "Add a package" form on GitHub, where you paste the address of the plugin or quark
 (for example `https://github.com/someone/their-plugin`). If you pasted that address
-into the search box first, the form already has it. You need a GitHub account to send
-the form. You can also open the form directly:
+into the search box first, the form already has it. If that address is already in the
+package list, the button shows that package instead of opening the form (an unreviewed
+one has a **Suggest for review** button). You need a GitHub account to send the form. You can also open the form directly:
 <https://github.com/shimpe/scdeken-recipes/issues/new?template=add-package.yml>.
 
 The maintainers get a pull request with a draft recipe and a build on every platform;

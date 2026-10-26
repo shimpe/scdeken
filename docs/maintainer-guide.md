@@ -114,6 +114,12 @@ recipes repository, or GitHub drops it and the workflow below never runs. A work
 at the repository (license, description, tags or the latest commit, CMake layout, the
 `SC_PATH`-style variable, submodules, a `.quark` file) and opens a pull request with a
 draft recipe. The PR build compiles it on every platform and comments with the results.
+If a recipe already has that repository (compared ignoring case, `.git` and a trailing
+`/`), the workflow names that recipe and closes the issue as not planned. If only the
+name clashes (ignoring case) with a recipe for another repository, it comments and leaves
+the issue open: write that recipe by hand under another name. The window does its own
+check first: when the address in the search box is already in the package list,
+**Suggest a package** shows that package instead of opening the form.
 
 ### By hand
 

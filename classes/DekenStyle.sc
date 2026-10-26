@@ -107,6 +107,28 @@ DekenStyle {
 		^t
 	}
 
+	// A repository address in one spelling, so "https://github.com/O/R.git/"
+	// and "github.com/o/r" compare equal: lowercase, no scheme, no ".git", no
+	// trailing slash.
+	*repoKey { |address|
+		var s = address.asString.stripWhiteSpace.toLower;
+		["https://", "http://"].do { |scheme| if(s.beginsWith(scheme)) { s = s.drop(scheme.size) } };
+		while { s.endsWith("/") } { s = s.drop(-1) };
+		if(s.endsWith(".git")) { s = s.drop(-4) };
+		while { s.endsWith("/") } { s = s.drop(-1) };
+		^s
+	}
+
+	// What the window says instead of opening the form when the suggested
+	// address is already in the package list. hit: that package's search hit.
+	*alreadyListedText { |hit|
+		var text = "% (%) is already in the package list. Its details are on the right.".format(hit["name"], hit["repo"]);
+		if(hit["trust"] == "unreviewed") {
+			text = text ++ " It has not been reviewed yet: Suggest for review asks the maintainers to look at it."
+		};
+		^text
+	}
+
 	// A new issue on the recipes repository about a local build that failed:
 	// title "Build failed: <package> <version> on <platform>", and a body with
 	// the platform key, the SuperCollider version and the last log lines. The

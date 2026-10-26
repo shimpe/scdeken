@@ -33,6 +33,15 @@ DekenRows {
 		}
 	}
 
+	// The package in catalog (search hits by lowercase name) whose repository
+	// is address, however it is spelled, or nil.
+	*findRepo { |catalog, address|
+		var key;
+		if(address.isNil) { ^nil };
+		key = DekenStyle.repoKey(address);
+		^catalog.values.detect { |hit| hit["repo"].notNil and: { DekenStyle.repoKey(hit["repo"]) == key } }
+	}
+
 	// The badge text of a row; busy rows say "working…". Before the row is
 	// planned its route is unknown, but a quark is never built, so its kind
 	// stands in for the route.

@@ -119,7 +119,7 @@ DekenGui {
 		};
 		suggestButton = Button().states_([["Suggest a package"]]).maxHeight_(24)
 			.toolTip_("Ask the maintainers to add a plugin or quark (opens a form on GitHub)")
-			.action_({ DekenStyle.suggestURL(DekenStyle.githubAddressIn(search.string)).openOS });
+			.action_({ this.prSuggest });
 		tree = TreeView().columns_(["Type", "Name", "Summary", "Status"]).minWidth_(480);
 		tree.onItemChanged = { this.prSelect };
 		tree.setProperty(\indentation, 0);
@@ -128,6 +128,21 @@ DekenGui {
 			HLayout(*(kindButtons ++ [nil, suggestButton])),
 			tree
 		).margins_(0).spacing_(6))
+	}
+
+	// Opens the form, unless the address in the search field is already in the
+	// package list: then that package is shown instead.
+	prSuggest {
+		var address = DekenStyle.githubAddressIn(search.string);
+		var known = DekenRows.findRepo(catalog, address);
+		var i;
+		if(known.isNil) { ^DekenStyle.suggestURL(address).openOS };
+		i = rows.detectIndex { |row| row[\name] == known["name"] };
+		if(i.notNil and: { items[i].notNil }) { tree.currentItem = items[i] };
+		if(selectedName != known["name"]) {
+			this.prShowRow(i !? { rows[i] } ?? { DekenRows.fromHit(known, installed[known["name"].toLower]) })
+		};
+		DekenDialogs.notice("Already in the list", DekenStyle.alreadyListedText(known))
 	}
 
 	prLogPage {

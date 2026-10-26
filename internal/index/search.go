@@ -4,6 +4,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/shimpe/scdeken/internal/advisory"
 	"github.com/shimpe/scdeken/internal/recipe"
 )
 
@@ -15,7 +16,7 @@ type SearchOptions struct {
 
 // Match says which part of a package matched the query.
 type Match struct {
-	Field string `json:"field"` // "name", "summary", "ugen" or "class"
+	Field string `json:"field"` // "repo", "name", "summary", "ugen" or "class"
 	Value string `json:"value"`
 }
 
@@ -23,6 +24,7 @@ type Match struct {
 type Result struct {
 	Name      string      `json:"name"`
 	Summary   string      `json:"summary"`
+	Repo      string      `json:"repo"`
 	Kind      recipe.Kind `json:"kind"`
 	Trust     Trust       `json:"trust"`
 	Latest    string      `json:"latest"`
@@ -32,23 +34,33 @@ type Result struct {
 
 // Fields a term can match, strongest first.
 const (
+	fieldRepo    = "repo"
 	fieldName    = "name"
 	fieldSummary = "summary"
 	fieldUGen    = "ugen"
 	fieldClass   = "class"
 )
 
-var fieldStrength = map[string]int{fieldName: 0, fieldSummary: 1, fieldUGen: 2, fieldClass: 3}
+var fieldStrength = map[string]int{fieldRepo: 0, fieldName: 0, fieldSummary: 1, fieldUGen: 2, fieldClass: 3}
 
 // Search finds packages in which every term of query matches the name,
-// summary, a UGen name or a class name, case-insensitively. Results are
-// ordered by match strength, trust, stars (most first) and name.
+// summary, a UGen name or a class name, case-insensitively. A query that is
+// one repository address finds the package of that repository instead,
+// however the address is spelled. Results are ordered by match strength,
+// trust, stars (most first) and name.
 func Search(ix *Index, query string, opts SearchOptions) []Result {
 	terms := strings.Fields(strings.ToLower(query))
+	repo, isRepo := repoQuery(query)
 	var hits []hit
 	for i := range ix.Packages {
 		p := &ix.Packages[i]
 		if !wanted(p, opts) {
+			continue
+		}
+		if isRepo {
+			if advisory.NormalizeRepo(p.Repo) == repo {
+				hits = append(hits, hit{p, &Match{fieldRepo, p.Repo}})
+			}
 			continue
 		}
 		m, ok := matchAll(p, terms)
@@ -58,6 +70,23 @@ func Search(ix *Index, query string, opts SearchOptions) []Result {
 	}
 	sort.SliceStable(hits, func(i, j int) bool { return hitLess(hits[i], hits[j]) })
 	return results(ix, hits)
+}
+
+// repoQuery returns the normalized address when query is one repository
+// address, such as "https://github.com/o/r", "github.com/o/r" or
+// "git@github.com:o/r.git".
+func repoQuery(query string) (string, bool) {
+	q := strings.TrimSpace(query)
+	if q == "" || len(strings.Fields(q)) != 1 {
+		return "", false
+	}
+	if strings.HasPrefix(strings.ToLower(q), "github.com/") {
+		q = "https://" + q
+	}
+	if !strings.Contains(q, "://") && !strings.HasPrefix(q, "git@") {
+		return "", false
+	}
+	return advisory.NormalizeRepo(q), true
 }
 
 // hit is a package that matched, with its strongest match (nil if no terms).
@@ -165,7 +194,7 @@ func results(ix *Index, hits []hit) []Result {
 
 func toResult(ix *Index, h hit) Result {
 	p := h.pkg
-	res := Result{Name: p.Name, Summary: p.Summary, Kind: p.Kind, Trust: p.Trust, Match: h.match}
+	res := Result{Name: p.Name, Summary: p.Summary, Repo: p.Repo, Kind: p.Kind, Trust: p.Trust, Match: h.match}
 	if r, ok := ix.Latest(p); ok {
 		res.Latest = r.Version
 	}

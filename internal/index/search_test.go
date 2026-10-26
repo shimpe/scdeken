@@ -88,3 +88,27 @@ func TestSearchLatestRetractedAndClassMatch(t *testing.T) {
 		t.Errorf("got %+v", rs)
 	}
 }
+
+func TestSearchByRepositoryAddress(t *testing.T) {
+	for _, q := range []string{
+		"https://github.com/c/panola",
+		"https://github.com/C/Panola.git",
+		" github.com/c/panola/ ",
+		"git@github.com:c/panola.git",
+	} {
+		rs := Search(fixture(), q, SearchOptions{})
+		if !reflect.DeepEqual(names(rs), []string{"Panola"}) {
+			t.Errorf("%q: got %v, want Panola", q, names(rs))
+			continue
+		}
+		if rs[0].Match == nil || rs[0].Match.Field != "repo" || rs[0].Repo != "https://github.com/c/panola" {
+			t.Errorf("%q: match %+v, repo %q; want a repo match on https://github.com/c/panola", q, rs[0].Match, rs[0].Repo)
+		}
+	}
+	if rs := Search(fixture(), "https://github.com/c/panola-other", SearchOptions{}); len(rs) != 0 {
+		t.Errorf("another repository: got %v, want nothing", names(rs))
+	}
+	if rs := Search(fixture(), "https://github.com/d/fm-thing", SearchOptions{}); len(rs) != 0 {
+		t.Errorf("unreviewed repository without IncludeUnreviewed: got %v, want nothing", names(rs))
+	}
+}

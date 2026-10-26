@@ -111,4 +111,14 @@ TestDekenStyle : UnitTest {
 		this.assertEquals(DekenStyle.githubAddressIn("granular reverb"), nil, "search words are not an address");
 		this.assertEquals(DekenStyle.githubAddressIn("https://github.com/a/b c"), nil, "not one address");
 	}
+
+	test_alreadyListed {
+		var reviewed = Dictionary.newFrom(["name", "Panola", "repo", "https://github.com/shimpe/panola", "trust", "reviewed"]);
+		var unreviewed = Dictionary.newFrom(["name", "thing", "repo", "https://github.com/o/thing", "trust", "unreviewed"]);
+		this.assertEquals(DekenStyle.repoKey(" HTTPS://github.com/O/R.git/ "), "github.com/o/r");
+		this.assertEquals(DekenStyle.repoKey("github.com/o/r"), "github.com/o/r");
+		this.assert(DekenStyle.alreadyListedText(reviewed).find("Panola (https://github.com/shimpe/panola) is already").notNil, "names the package");
+		this.assert(DekenStyle.alreadyListedText(reviewed).find("Suggest for review").isNil, "reviewed: nothing to suggest");
+		this.assert(DekenStyle.alreadyListedText(unreviewed).find("Suggest for review").notNil, "unreviewed: points to Suggest for review");
+	}
 }
