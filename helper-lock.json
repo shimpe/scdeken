@@ -1,11 +1,11 @@
 {
-  "version": "0.1.1",
+  "version": "0.1.2",
   "sha256": {
-    "linux-arm64": "4aa4a1a3d4fc57c78f301ca62eca23dbf6f89a83bd4e4b0ffa1d09857bd36315",
-    "linux-x86_64": "26cda8451995c55f75a5359caf25b6b0d38a74ffd85ad0713f0682536344ca97",
-    "macos-arm64": "c3d322a577949392071e0002e1da74a5531bedd9ac2d7cd6d30c19a121570057",
-    "macos-x86_64": "8c1b0fa9cab46a5917f6993f7abe1a21d6fb80f09e836d373651cf3302102c74",
-    "windows-x86_64": "c78ee767e7ef300e32209c855b1c47537bb28f1bd06a25c1ad5f14625a3da0bc"
+    "linux-arm64": "8484082532cbe9961fc4c00db4b251500b7a6c294e80f3914bc090794fc298ed",
+    "linux-x86_64": "8780ff91779c0844175ed8135313d24ce3cfba5a8733737c44584bfc101e7c2b",
+    "macos-arm64": "7c3451f4bd6e3fb1db301b5cd813fb1fae72285c16e592a243b09fc09881cfcb",
+    "macos-x86_64": "8a6d14c404bd0b920ebb254a31a0a60798e0182cedeb1757eb6392ed3b1a5afd",
+    "windows-x86_64": "9c037329f4edd2e05e22361227d7be6d5507e72e3a7dcf7419739b45fdbf15ed"
   },
   "url": "https://github.com/shimpe/scdeken/releases/download/v{version}/scdeken-{platform}{ext}"
 }
