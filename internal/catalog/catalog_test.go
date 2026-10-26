@@ -21,18 +21,24 @@ const password = "test-password"
 
 type testKey struct {
 	pub  string
-	priv []byte
+	priv sign.Key
 }
 
 var (
 	keysOnce sync.Once
-	keys     [2]testKey // key generation is slow, so each test binary makes two
+	// Generating and unlocking a key each run scrypt (about a second and
+	// 1 GiB), so each test binary makes two keys and unlocks them once.
+	keys [2]testKey
 )
 
 func testKeys() [2]testKey {
 	keysOnce.Do(func() {
 		for i := range keys {
-			pub, priv, err := sign.GenerateKey(password)
+			pub, encrypted, err := sign.GenerateKey(password)
+			if err != nil {
+				panic(err)
+			}
+			priv, err := sign.Unlock(encrypted, password)
 			if err != nil {
 				panic(err)
 			}
@@ -88,11 +94,7 @@ func (s *server) url() string { return s.Server.URL + "/index.json" }
 
 func signed(t *testing.T, k testKey, body string) (index, sig []byte) {
 	t.Helper()
-	sig, err := sign.Sign(k.priv, password, []byte(body))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return []byte(body), sig
+	return []byte(body), k.priv.Sign([]byte(body))
 }
 
 func indexJSON(generated string, extra string) string {

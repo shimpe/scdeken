@@ -33,12 +33,29 @@ func GenerateKey(password string) (publicKey string, encryptedPrivateKey []byte,
 
 // Sign signs msg and returns the contents of a minisign signature file.
 func Sign(encryptedPrivateKey []byte, password string, msg []byte) ([]byte, error) {
+	key, err := Unlock(encryptedPrivateKey, password)
+	if err != nil {
+		return nil, err
+	}
+	return key.Sign(msg), nil
+}
+
+// Key is an unlocked private key. Unlocking runs scrypt with libsodium's
+// "sensitive" cost (about a second and 1 GiB of memory), so a caller that
+// signs several messages unlocks once.
+type Key struct{ priv minisign.PrivateKey }
+
+// Unlock decrypts a private key made by GenerateKey.
+func Unlock(encryptedPrivateKey []byte, password string) (Key, error) {
 	priv, err := minisign.DecryptKey(password, encryptedPrivateKey)
 	if err != nil {
-		return nil, fmt.Errorf("unlock signing key: %w", err)
+		return Key{}, fmt.Errorf("unlock signing key: %w", err)
 	}
-	return minisign.Sign(priv, msg), nil
+	return Key{priv}, nil
 }
+
+// Sign signs msg and returns the contents of a minisign signature file.
+func (k Key) Sign(msg []byte) []byte { return minisign.Sign(k.priv, msg) }
 
 // Verify returns nil only if sig is a valid signature of msg by at least one
 // of the trusted public keys. Keys that cannot be parsed are skipped.

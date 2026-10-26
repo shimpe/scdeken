@@ -32,16 +32,21 @@ const password = "test-password"
 var (
 	keyOnce sync.Once
 	keyPub  string
-	keyPriv []byte
+	keyPriv sign.Key
 )
 
-// testKey makes one throwaway signing key per test binary; generating is slow.
-func testKey() (string, []byte) {
+// testKey makes one throwaway signing key per test binary, unlocked once:
+// generating and unlocking each run scrypt (about a second and 1 GiB).
+func testKey() (string, sign.Key) {
 	keyOnce.Do(func() {
-		var err error
-		if keyPub, keyPriv, err = sign.GenerateKey(password); err != nil {
+		pub, encrypted, err := sign.GenerateKey(password)
+		if err != nil {
 			panic(err)
 		}
+		if keyPriv, err = sign.Unlock(encrypted, password); err != nil {
+			panic(err)
+		}
+		keyPub = pub
 	})
 	return keyPub, keyPriv
 }
@@ -128,10 +133,7 @@ func newWorld(t *testing.T) *world {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sig, err := sign.Sign(priv, password, body)
-	if err != nil {
-		t.Fatal(err)
-	}
+	sig := priv.Sign(body)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, ".minisig") {
 			w.Write(sig)
